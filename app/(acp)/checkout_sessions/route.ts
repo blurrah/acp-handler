@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import type { CheckoutSessionBase } from "@/types/agentic_checkout";
+import type {
+  CheckoutSessionBase,
+  MessageError,
+} from "@/types/agentic_checkout";
 import {
   checkoutSessionBaseSchema,
   checkoutSessionCreateRequestSchema,
@@ -11,20 +14,56 @@ import {
 export async function POST(request: Request) {
   const body = await request.json();
 
-  const data = checkoutSessionCreateRequestSchema.parse(body);
+  // Validate the session create request body
+  const parsedRequest = checkoutSessionCreateRequestSchema.safeParse(body);
 
-  const bla = {
+  if (!parsedRequest.success) {
+    return NextResponse.json(
+      {
+        type: "error",
+        code: "invalid",
+        content_type: "plain",
+        content: data.error.message,
+      } satisfies MessageError,
+      { status: 400 },
+    );
+  }
+
+  const { data } = parsedRequest;
+
+  // Your response
+  const yourResponse = {
     id: "123",
     status: "not_ready_for_payment",
     currency: "USD",
-    line_items: [],
+    line_items: data.items.map((item) => ({
+      id: item.id,
+      item: item,
+      base_amount: 0,
+      discount: 0,
+      subtotal: 0,
+      tax: 0,
+      total: 0,
+    })),
     totals: [],
     fulfillment_options: [],
     messages: [],
     links: [],
   } satisfies CheckoutSessionBase;
 
-  const cool = checkoutSessionBaseSchema.parse(bla);
+  const parsedResponse = checkoutSessionBaseSchema.safeParse(yourResponse);
 
-  return NextResponse.json(cool, { status: 201 });
+  if (!parsedResponse.success) {
+    return NextResponse.json(
+      {
+        type: "error",
+        code: "invalid",
+        content_type: "plain",
+        content: "Something went wrong while creating the checkout session",
+      } satisfies MessageError,
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json(parsedResponse.data, { status: 201 });
 }

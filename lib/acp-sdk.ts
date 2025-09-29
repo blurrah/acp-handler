@@ -1,9 +1,49 @@
-// Commerce SDK - ACP Protocol Helpers
+// ACP SDK - Agentic Commerce Protocol Helpers
 // Provides validation, formatting, and common patterns for ACP compliance
 
 import { z } from 'zod';
-import type { CheckoutSession } from './types';
-import { CreateCheckoutSessionSchema } from './validation';
+
+// ============================================================================
+// Re-export all types from types.ts
+// ============================================================================
+
+export type {
+  Product,
+  CheckoutSession,
+  CartItem,
+  CustomerInfo,
+  ShippingInfo,
+  BillingInfo,
+  Address,
+  CheckoutTotals,
+  ShippingOption,
+  CreateCheckoutSessionRequest,
+  CreateCheckoutSessionResponse,
+  GetCheckoutSessionResponse,
+  UpdateCheckoutSessionRequest,
+  UpdateCheckoutSessionResponse,
+  CompleteCheckoutSessionRequest,
+  CompleteCheckoutSessionResponse,
+  CancelCheckoutSessionResponse,
+  Order,
+  OrderItem,
+  ErrorResponse,
+} from './types';
+
+// ============================================================================
+// Re-export all schemas from validation.ts
+// ============================================================================
+
+export {
+  AddressSchema,
+  CustomerInfoSchema,
+  ShippingInfoSchema,
+  BillingInfoSchema,
+  CreateCheckoutSessionSchema,
+  UpdateCheckoutSessionSchema,
+  CompleteCheckoutSessionSchema,
+  validateRequest,
+} from './validation';
 
 // ============================================================================
 // Request Validation
@@ -178,7 +218,7 @@ export function canTransitionState(
 }
 
 // ============================================================================
-// Export schemas for convenience
+// Export session state type
 // ============================================================================
 
-export { CreateCheckoutSessionSchema };
+export type { SessionState };

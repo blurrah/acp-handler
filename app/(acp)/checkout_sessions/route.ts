@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validateCheckoutState } from "@/lib/validation";
 import type {
   CheckoutSessionBase,
   MessageError,
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
         type: "error",
         code: "invalid",
         content_type: "plain",
-        content: data.error.message,
+        content: parsedRequest.error.message,
       } satisfies MessageError,
       { status: 400 },
     );
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   // Your response
   const yourResponse = {
     id: "123",
-    status: "not_ready_for_payment",
+    status: validateCheckoutState(data),
     currency: "USD",
     line_items: data.items.map((item) => ({
       id: item.id,

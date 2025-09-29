@@ -3,15 +3,22 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { createAuthErrorResponse, validateApiKey } from "@/lib/auth";
+import { validateApiKey } from "@/lib/auth";
 import { getProductById, sessions } from "@/lib/data";
-import type { CartItem, CheckoutSession } from "@/lib/types";
 import {
   calculateTotals,
   getAvailableShippingOptions,
   isSessionExpired,
 } from "@/lib/utils";
-import { UpdateCheckoutSessionSchema, validateRequest } from "@/lib/validation";
+import {
+  validateACPRequest,
+  formatACPResponse,
+  ACPError,
+  canTransitionState,
+  UpdateCheckoutSessionSchema,
+  type CartItem,
+  type CheckoutSession,
+} from "@/lib/acp-sdk";
 
 // ============================================================================
 // GET - Retrieve Session
@@ -23,7 +30,7 @@ export async function GET(
 ) {
   // Authentication
   if (!validateApiKey(request)) {
-    return createAuthErrorResponse();
+    return ACPError.unauthorized();
   }
 
   const sessionId = params.id;
@@ -32,31 +39,15 @@ export async function GET(
   const session = sessions.get(sessionId);
 
   if (!session) {
-    return Response.json(
-      {
-        error: {
-          code: "session_not_found",
-          message: `Checkout session with ID "${sessionId}" not found`,
-        },
-      },
-      { status: 404 },
-    );
+    return ACPError.sessionNotFound(sessionId);
   }
 
   // Check if session is expired
   if (isSessionExpired(session.expires_at)) {
-    return Response.json(
-      {
-        error: {
-          code: "session_expired",
-          message: "This checkout session has expired",
-        },
-      },
-      { status: 400 },
-    );
+    return ACPError.sessionExpired(sessionId);
   }
 
-  return Response.json({ session });
+  return formatACPResponse({ session }, { status: 200 });
 }
 
 // ============================================================================
@@ -69,7 +60,7 @@ export async function POST(
 ) {
   // Authentication
   if (!validateApiKey(request)) {
-    return createAuthErrorResponse();
+    return ACPError.unauthorized();
   }
 
   const sessionId = params.id;
@@ -78,73 +69,24 @@ export async function POST(
   const existingSession = sessions.get(sessionId);
 
   if (!existingSession) {
-    return Response.json(
-      {
-        error: {
-          code: "session_not_found",
-          message: `Checkout session with ID "${sessionId}" not found`,
-        },
-      },
-      { status: 404 },
-    );
+    return ACPError.sessionNotFound(sessionId);
   }
 
   // Check if session is expired
   if (isSessionExpired(existingSession.expires_at)) {
-    return Response.json(
-      {
-        error: {
-          code: "session_expired",
-          message: "This checkout session has expired",
-        },
-      },
-      { status: 400 },
-    );
+    return ACPError.sessionExpired(sessionId);
   }
 
   // Check if session is already completed or cancelled
   if (existingSession.status !== "open") {
-    return Response.json(
-      {
-        error: {
-          code: "session_not_open",
-          message: `Cannot update a session with status "${existingSession.status}"`,
-        },
-      },
-      { status: 400 },
-    );
+    return ACPError.invalidState(existingSession.status, "update");
   }
 
   // Parse and validate request
-  let requestData: unknown;
-
-  try {
-    requestData = await request.json();
-  } catch (error) {
-    return Response.json(
-      {
-        error: {
-          code: "invalid_request",
-          message: "Invalid JSON in request body",
-        },
-      },
-      { status: 400 },
-    );
-  }
-
-  const validation = validateRequest(UpdateCheckoutSessionSchema, requestData);
+  const validation = await validateACPRequest(request, UpdateCheckoutSessionSchema);
 
   if (!validation.success) {
-    return Response.json(
-      {
-        error: {
-          code: "validation_error",
-          message: validation.error,
-          details: validation.details,
-        },
-      },
-      { status: 400 },
-    );
+    return Response.json(validation.error, { status: validation.status });
   }
 
   const body = validation.data;
@@ -167,27 +109,11 @@ export async function POST(
       const product = getProductById(item.product_id);
 
       if (!product) {
-        return Response.json(
-          {
-            error: {
-              code: "product_not_found",
-              message: `Product with ID "${item.product_id}" not found`,
-            },
-          },
-          { status: 404 },
-        );
+        return ACPError.productNotFound(item.product_id);
       }
 
       if (!product.available) {
-        return Response.json(
-          {
-            error: {
-              code: "product_unavailable",
-              message: `Product "${product.name}" is currently unavailable`,
-            },
-          },
-          { status: 400 },
-        );
+        return ACPError.productUnavailable(product.name);
       }
 
       // TODO: Add inventory check
@@ -281,5 +207,5 @@ export async function POST(
   // Return Response
   // ============================================================================
 
-  return Response.json({ session: updatedSession });
+  return formatACPResponse({ session: updatedSession }, { status: 200 });
 }

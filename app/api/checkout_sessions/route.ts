@@ -2,16 +2,24 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { createAuthErrorResponse, validateApiKey } from "@/lib/auth";
+import { validateApiKey } from "@/lib/auth";
 import { getProductById, sessions, idempotencyKeys } from "@/lib/data";
-import type { CartItem, CheckoutSession } from "@/lib/types";
 import {
   calculateTotals,
   generateSessionId,
   getAvailableShippingOptions,
   getExpirationTime,
 } from "@/lib/utils";
-import { CreateCheckoutSessionSchema, validateRequest } from "@/lib/validation";
+import {
+  validateACPRequest,
+  formatACPResponse,
+  ACPError,
+  handleIdempotencyKey,
+  storeIdempotencyKey,
+  CreateCheckoutSessionSchema,
+  type CartItem,
+  type CheckoutSession,
+} from "@/lib/acp-sdk";
 
 export async function POST(request: NextRequest) {
   // ============================================================================
@@ -20,42 +28,17 @@ export async function POST(request: NextRequest) {
   // ============================================================================
 
   if (!validateApiKey(request)) {
-    return createAuthErrorResponse();
+    return ACPError.unauthorized();
   }
 
   // ============================================================================
   // 2. Parse and Validate Request with Zod
   // ============================================================================
 
-  let requestData: unknown;
-
-  try {
-    requestData = await request.json();
-  } catch (error) {
-    return Response.json(
-      {
-        error: {
-          code: "invalid_request",
-          message: "Invalid JSON in request body",
-        },
-      },
-      { status: 400 },
-    );
-  }
-
-  const validation = validateRequest(CreateCheckoutSessionSchema, requestData);
+  const validation = await validateACPRequest(request, CreateCheckoutSessionSchema);
 
   if (!validation.success) {
-    return Response.json(
-      {
-        error: {
-          code: "validation_error",
-          message: validation.error,
-          details: validation.details,
-        },
-      },
-      { status: 400 },
-    );
+    return Response.json(validation.error, { status: validation.status });
   }
 
   const body = validation.data;
@@ -64,20 +47,19 @@ export async function POST(request: NextRequest) {
   // 3. Check Idempotency Key
   // ============================================================================
 
-  if (body.idempotency_key) {
-    const existing = idempotencyKeys.get(body.idempotency_key);
-
-    if (existing) {
-      // Return existing session if idempotency key already used
-      const session = sessions.get(existing.sessionId);
-
-      if (session) {
-        return Response.json(
-          { session },
-          { status: 200 },
-        );
+  const idempotencyCheck = await handleIdempotencyKey(body.idempotency_key, {
+    check: (key) => {
+      const existing = idempotencyKeys.get(key);
+      if (existing) {
+        return sessions.get(existing.sessionId) || null;
       }
-    }
+      return null;
+    },
+    store: () => {}, // Storage handled after session creation
+  });
+
+  if (idempotencyCheck.exists) {
+    return formatACPResponse({ session: idempotencyCheck.value }, { status: 200 });
   }
 
   // ============================================================================
@@ -92,28 +74,12 @@ export async function POST(request: NextRequest) {
     const product = getProductById(item.product_id);
 
     if (!product) {
-      return Response.json(
-        {
-          error: {
-            code: "product_not_found",
-            message: `Product with ID "${item.product_id}" not found`,
-          },
-        },
-        { status: 404 },
-      );
+      return ACPError.productNotFound(item.product_id);
     }
 
     // Validate product is available
     if (!product.available) {
-      return Response.json(
-        {
-          error: {
-            code: "product_unavailable",
-            message: `Product "${product.name}" is currently unavailable`,
-          },
-        },
-        { status: 400 },
-      );
+      return ACPError.productUnavailable(product.name);
     }
 
     // TODO: Add inventory check
@@ -172,21 +138,18 @@ export async function POST(request: NextRequest) {
   sessions.set(sessionId, session);
 
   // Store idempotency key if provided
-  if (body.idempotency_key) {
-    idempotencyKeys.set(body.idempotency_key, {
-      sessionId,
-      createdAt: new Date(),
-    });
-  }
+  await storeIdempotencyKey(body.idempotency_key, session, {
+    store: (key, value) => {
+      idempotencyKeys.set(key, {
+        sessionId: value.id,
+        createdAt: new Date(),
+      });
+    },
+  });
 
   // ============================================================================
   // 8. Return Response
   // ============================================================================
 
-  return Response.json(
-    {
-      session,
-    },
-    { status: 201 },
-  );
+  return formatACPResponse({ session }, { status: 201 });
 }

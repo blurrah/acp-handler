@@ -2,18 +2,23 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { createAuthErrorResponse, validateApiKey } from "@/lib/auth";
+import { validateApiKey } from "@/lib/auth";
 import { orders, sessions } from "@/lib/data";
-import type { Order, OrderItem } from "@/lib/types";
 import {
   generateOrderId,
   generateOrderNumber,
   isSessionExpired,
 } from "@/lib/utils";
 import {
+  validateACPRequest,
+  formatACPResponse,
+  formatACPError,
+  ACPError,
+  canTransitionState,
   CompleteCheckoutSessionSchema,
-  validateRequest,
-} from "@/lib/validation";
+  type Order,
+  type OrderItem,
+} from "@/lib/acp-sdk";
 
 export async function POST(
   request: NextRequest,
@@ -24,7 +29,7 @@ export async function POST(
   // ============================================================================
 
   if (!validateApiKey(request)) {
-    return createAuthErrorResponse();
+    return ACPError.unauthorized();
   }
 
   const sessionId = params.id;
@@ -36,77 +41,42 @@ export async function POST(
   const session = sessions.get(sessionId);
 
   if (!session) {
-    return Response.json(
-      {
-        error: {
-          code: "session_not_found",
-          message: `Checkout session with ID "${sessionId}" not found`,
-        },
-      },
-      { status: 404 },
-    );
+    return ACPError.sessionNotFound(sessionId);
   }
 
   // Check if session is expired
   if (isSessionExpired(session.expires_at)) {
-    return Response.json(
-      {
-        error: {
-          code: "session_expired",
-          message: "This checkout session has expired",
-        },
-      },
-      { status: 400 },
-    );
+    return ACPError.sessionExpired(sessionId);
   }
 
-  // Check if session is already completed or cancelled
-  if (session.status !== "open") {
-    return Response.json(
-      {
-        error: {
-          code: "session_not_open",
-          message: `Cannot complete a session with status "${session.status}"`,
-        },
-      },
-      { status: 400 },
-    );
+  // Check if session can transition to completed
+  const transitionCheck = canTransitionState(session.status, "completed");
+  if (!transitionCheck.valid) {
+    return ACPError.invalidState(session.status, "complete");
   }
 
   // Validate required fields for checkout
   if (!session.customer?.email) {
-    return Response.json(
-      {
-        error: {
-          code: "missing_customer_info",
-          message: "Customer email is required to complete checkout",
-        },
-      },
-      { status: 400 },
+    return formatACPError(
+      "missing_customer_info",
+      "Customer email is required to complete checkout",
+      { status: 400 }
     );
   }
 
   if (!session.shipping?.address) {
-    return Response.json(
-      {
-        error: {
-          code: "missing_shipping_info",
-          message: "Shipping address is required to complete checkout",
-        },
-      },
-      { status: 400 },
+    return formatACPError(
+      "missing_shipping_info",
+      "Shipping address is required to complete checkout",
+      { status: 400 }
     );
   }
 
   if (!session.billing?.address) {
-    return Response.json(
-      {
-        error: {
-          code: "missing_billing_info",
-          message: "Billing address is required to complete checkout",
-        },
-      },
-      { status: 400 },
+    return formatACPError(
+      "missing_billing_info",
+      "Billing address is required to complete checkout",
+      { status: 400 }
     );
   }
 
@@ -114,38 +84,10 @@ export async function POST(
   // 3. Parse and Validate Payment Request
   // ============================================================================
 
-  let requestData: unknown;
-
-  try {
-    requestData = await request.json();
-  } catch (error) {
-    return Response.json(
-      {
-        error: {
-          code: "invalid_request",
-          message: "Invalid JSON in request body",
-        },
-      },
-      { status: 400 },
-    );
-  }
-
-  const validation = validateRequest(
-    CompleteCheckoutSessionSchema,
-    requestData,
-  );
+  const validation = await validateACPRequest(request, CompleteCheckoutSessionSchema);
 
   if (!validation.success) {
-    return Response.json(
-      {
-        error: {
-          code: "validation_error",
-          message: validation.error,
-          details: validation.details,
-        },
-      },
-      { status: 400 },
-    );
+    return Response.json(validation.error, { status: validation.status });
   }
 
   const body = validation.data;
@@ -171,15 +113,10 @@ export async function POST(
   const paymentSuccessful = true;
 
   if (!paymentSuccessful) {
-    return Response.json(
-      {
-        error: {
-          code: "payment_failed",
-          message:
-            "Payment processing failed. Please check your payment details and try again.",
-        },
-      },
-      { status: 402 },
+    return formatACPError(
+      "payment_failed",
+      "Payment processing failed. Please check your payment details and try again.",
+      { status: 402 }
     );
   }
 
@@ -239,8 +176,5 @@ export async function POST(
   // 8. Return Response
   // ============================================================================
 
-  return Response.json({
-    session,
-    order,
-  });
+  return formatACPResponse({ session, order }, { status: 200 });
 }

@@ -2,9 +2,14 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { createAuthErrorResponse, validateApiKey } from "@/lib/auth";
+import { validateApiKey } from "@/lib/auth";
 import { sessions } from "@/lib/data";
 import { isSessionExpired } from "@/lib/utils";
+import {
+  formatACPResponse,
+  ACPError,
+  canTransitionState,
+} from "@/lib/acp-sdk";
 
 export async function POST(
   request: NextRequest,
@@ -15,7 +20,7 @@ export async function POST(
   // ============================================================================
 
   if (!validateApiKey(request)) {
-    return createAuthErrorResponse();
+    return ACPError.unauthorized();
   }
 
   const sessionId = params.id;
@@ -27,41 +32,13 @@ export async function POST(
   const session = sessions.get(sessionId);
 
   if (!session) {
-    return Response.json(
-      {
-        error: {
-          code: "session_not_found",
-          message: `Checkout session with ID "${sessionId}" not found`,
-        },
-      },
-      { status: 404 },
-    );
+    return ACPError.sessionNotFound(sessionId);
   }
 
-  // Check if session is already cancelled
-  if (session.status === "cancelled") {
-    return Response.json(
-      {
-        error: {
-          code: "already_cancelled",
-          message: "This checkout session has already been cancelled",
-        },
-      },
-      { status: 400 },
-    );
-  }
-
-  // Check if session is already completed
-  if (session.status === "completed") {
-    return Response.json(
-      {
-        error: {
-          code: "session_completed",
-          message: "Cannot cancel a completed checkout session",
-        },
-      },
-      { status: 400 },
-    );
+  // Check if session can transition to cancelled
+  const transitionCheck = canTransitionState(session.status, "cancelled");
+  if (!transitionCheck.valid) {
+    return ACPError.invalidState(session.status, "cancel");
   }
 
   // Allow cancelling expired sessions (mark them as cancelled for clarity)
@@ -90,8 +67,5 @@ export async function POST(
   // 5. Return Response
   // ============================================================================
 
-  return Response.json({
-    session,
-    cancelled: true,
-  });
+  return formatACPResponse({ session, cancelled: true }, { status: 200 });
 }

@@ -64,6 +64,10 @@ export const SAMPLE_PRODUCTS: Product[] = [
 export const sessions = new Map<string, CheckoutSession>();
 export const orders = new Map<string, Order>();
 
+// Idempotency key storage: Maps idempotency keys to session IDs
+// In production, use a database with TTL/expiration (e.g., Redis)
+export const idempotencyKeys = new Map<string, { sessionId: string; createdAt: Date }>();
+
 // ============================================================================
 // Helper Functions
 // ============================================================================

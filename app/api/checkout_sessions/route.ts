@@ -3,7 +3,7 @@
 
 import type { NextRequest } from "next/server";
 import { createAuthErrorResponse, validateApiKey } from "@/lib/auth";
-import { getProductById, sessions } from "@/lib/data";
+import { getProductById, sessions, idempotencyKeys } from "@/lib/data";
 import type { CartItem, CheckoutSession } from "@/lib/types";
 import {
   calculateTotals,
@@ -61,7 +61,27 @@ export async function POST(request: NextRequest) {
   const body = validation.data;
 
   // ============================================================================
-  // 3. Validate Products and Build Cart
+  // 3. Check Idempotency Key
+  // ============================================================================
+
+  if (body.idempotency_key) {
+    const existing = idempotencyKeys.get(body.idempotency_key);
+
+    if (existing) {
+      // Return existing session if idempotency key already used
+      const session = sessions.get(existing.sessionId);
+
+      if (session) {
+        return Response.json(
+          { session },
+          { status: 200 },
+        );
+      }
+    }
+  }
+
+  // ============================================================================
+  // 4. Validate Products and Build Cart
   // TODO: Replace with your product validation logic
   // ============================================================================
 
@@ -112,14 +132,14 @@ export async function POST(request: NextRequest) {
   }
 
   // ============================================================================
-  // 4. Calculate Totals
+  // 5. Calculate Totals
   // ============================================================================
 
   const currency = body.currency || "USD";
   const totals = calculateTotals(cart);
 
   // ============================================================================
-  // 5. Create Checkout Session
+  // 6. Create Checkout Session
   // ============================================================================
 
   const sessionId = generateSessionId();
@@ -145,14 +165,22 @@ export async function POST(request: NextRequest) {
   }
 
   // ============================================================================
-  // 6. Store Session
+  // 7. Store Session and Idempotency Key
   // TODO: Replace with database storage
   // ============================================================================
 
   sessions.set(sessionId, session);
 
+  // Store idempotency key if provided
+  if (body.idempotency_key) {
+    idempotencyKeys.set(body.idempotency_key, {
+      sessionId,
+      createdAt: new Date(),
+    });
+  }
+
   // ============================================================================
-  // 7. Return Response
+  // 8. Return Response
   // ============================================================================
 
   return Response.json(

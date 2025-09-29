@@ -46,6 +46,7 @@ export const CreateCheckoutSessionSchema = z.object({
   ).min(1, 'Cart must contain at least one item'),
   customer: CustomerInfoSchema.optional(),
   currency: z.string().length(3).default('USD').optional(),
+  idempotency_key: z.string().min(1, 'Idempotency key is required').optional(),
 });
 
 // POST /checkout_sessions/{id} - Update Session

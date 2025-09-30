@@ -7,21 +7,24 @@ export function handler(fn: (req: Request) => Promise<Response>) {
   return async (req: NextRequest) => fn(req as unknown as Request);
 }
 
-export type NextHandlers = {
-  create: (req: Request, body: unknown) => Promise<Response>;
-  update: (req: Request, id: string, body: unknown) => Promise<Response>;
-  complete: (req: Request, id: string, body: unknown) => Promise<Response>;
+export type NextHandlers<C, U, X> = {
+  create: (req: Request, body: C) => Promise<Response>;
+  update: (req: Request, id: string, body: U) => Promise<Response>;
+  complete: (req: Request, id: string, body: X) => Promise<Response>;
   cancel: (req: Request, id: string) => Promise<Response>;
   get: (req: Request, id: string) => Promise<Response>;
 };
 
-export type NextSchemaSet = {
-  CreateCheckoutSessionSchema: z.ZodTypeAny;
-  UpdateCheckoutSessionSchema: z.ZodTypeAny;
-  CompleteCheckoutSessionSchema: z.ZodTypeAny;
+export type NextSchemaSet<C, U, X> = {
+  CreateCheckoutSessionSchema: z.ZodType<C>;
+  UpdateCheckoutSessionSchema: z.ZodType<U>;
+  CompleteCheckoutSessionSchema: z.ZodType<X>;
 };
 
-export function createNextCatchAll(H: NextHandlers, S: NextSchemaSet) {
+export function createNextCatchAll<C, U, X>(
+  H: NextHandlers<C, U, X>,
+  S: NextSchemaSet<C, U, X>,
+) {
   async function GET(
     req: NextRequest,
     { params }: { params: { segments?: string[] } },
@@ -41,7 +44,7 @@ export function createNextCatchAll(H: NextHandlers, S: NextSchemaSet) {
     if (seg.length === 0) {
       const parsed = await parseJSON<unknown>(req as unknown as Request);
       if (!parsed.ok) return parsed.res;
-      const v = validateBody(S.CreateCheckoutSessionSchema, parsed.body);
+      const v = validateBody<C>(S.CreateCheckoutSessionSchema, parsed.body);
       if (!v.ok) return v.res;
       return H.create(req as unknown as Request, v.data);
     }
@@ -50,7 +53,7 @@ export function createNextCatchAll(H: NextHandlers, S: NextSchemaSet) {
     if (seg.length === 1) {
       const parsed = await parseJSON<unknown>(req as unknown as Request);
       if (!parsed.ok) return parsed.res;
-      const v = validateBody(S.UpdateCheckoutSessionSchema, parsed.body);
+      const v = validateBody<U>(S.UpdateCheckoutSessionSchema, parsed.body);
       if (!v.ok) return v.res;
       return H.update(req as unknown as Request, seg[0]!, v.data);
     }
@@ -59,7 +62,7 @@ export function createNextCatchAll(H: NextHandlers, S: NextSchemaSet) {
     if (seg.length === 2 && seg[1] === "complete") {
       const parsed = await parseJSON<unknown>(req as unknown as Request);
       if (!parsed.ok) return parsed.res;
-      const v = validateBody(S.CompleteCheckoutSessionSchema, parsed.body);
+      const v = validateBody<X>(S.CompleteCheckoutSessionSchema, parsed.body);
       if (!v.ok) return v.res;
       return H.complete(req as unknown as Request, seg[0]!, v.data);
     }

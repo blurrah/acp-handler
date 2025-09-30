@@ -64,10 +64,10 @@ const outbound = {
 };
 
 // Build protocol handlers from SDK
-const H = createHandlers({ catalog, psp, store, outbound });
+const handlers = createHandlers({ catalog, psp, store, outbound });
 
 // Use SDK’s validated catch-all
-const { GET, POST } = createNextCatchAll(H, {
+const { GET, POST } = createNextCatchAll(handlers, {
   CreateCheckoutSessionSchema,
   UpdateCheckoutSessionSchema,
   CompleteCheckoutSessionSchema,

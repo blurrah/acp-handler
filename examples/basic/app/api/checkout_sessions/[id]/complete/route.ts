@@ -2,23 +2,23 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { validateApiKey } from "@/lib/auth";
-import { orders, sessions } from "@/lib/data";
+import {
+  ACPError,
+  CompleteCheckoutSessionSchema,
+  canTransitionState,
+  formatACPError,
+  formatACPResponse,
+  type Order,
+  type OrderItem,
+  validateACPRequest,
+} from "@/examples/basic/lib/acp-sdk";
+import { validateApiKey } from "@/examples/basic/lib/auth";
+import { orders, sessions } from "@/examples/basic/lib/data";
 import {
   generateOrderId,
   generateOrderNumber,
   isSessionExpired,
-} from "@/lib/utils";
-import {
-  validateACPRequest,
-  formatACPResponse,
-  formatACPError,
-  ACPError,
-  canTransitionState,
-  CompleteCheckoutSessionSchema,
-  type Order,
-  type OrderItem,
-} from "@/lib/acp-sdk";
+} from "@/examples/basic/lib/utils";
 
 export async function POST(
   request: NextRequest,
@@ -60,7 +60,7 @@ export async function POST(
     return formatACPError(
       "missing_customer_info",
       "Customer email is required to complete checkout",
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -68,7 +68,7 @@ export async function POST(
     return formatACPError(
       "missing_shipping_info",
       "Shipping address is required to complete checkout",
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -76,7 +76,7 @@ export async function POST(
     return formatACPError(
       "missing_billing_info",
       "Billing address is required to complete checkout",
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -84,7 +84,10 @@ export async function POST(
   // 3. Parse and Validate Payment Request
   // ============================================================================
 
-  const validation = await validateACPRequest(request, CompleteCheckoutSessionSchema);
+  const validation = await validateACPRequest(
+    request,
+    CompleteCheckoutSessionSchema,
+  );
 
   if (!validation.success) {
     return Response.json(validation.error, { status: validation.status });
@@ -116,7 +119,7 @@ export async function POST(
     return formatACPError(
       "payment_failed",
       "Payment processing failed. Please check your payment details and try again.",
-      { status: 402 }
+      { status: 402 },
     );
   }
 

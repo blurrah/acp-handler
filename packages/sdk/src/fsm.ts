@@ -1,4 +1,4 @@
-import type { CheckoutSessionStatus } from "./types";
+import type { CheckoutSessionStatus } from "../core/types";
 
 const ALLOWED: Record<CheckoutSessionStatus, CheckoutSessionStatus[]> = {
   not_ready_for_payment: ["ready_for_payment", "canceled"],

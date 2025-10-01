@@ -2,14 +2,14 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { validateApiKey } from "@/lib/auth";
-import { sessions } from "@/lib/data";
-import { isSessionExpired } from "@/lib/utils";
 import {
-  formatACPResponse,
   ACPError,
   canTransitionState,
-} from "@/lib/acp-sdk";
+  formatACPResponse,
+} from "@/examples/basic/lib/acp-sdk";
+import { validateApiKey } from "@/examples/basic/lib/auth";
+import { sessions } from "@/examples/basic/lib/data";
+import { isSessionExpired } from "@/examples/basic/lib/utils";
 
 export async function POST(
   request: NextRequest,

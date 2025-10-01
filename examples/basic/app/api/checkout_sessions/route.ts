@@ -2,24 +2,28 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { validateApiKey } from "@/lib/auth";
-import { getProductById, sessions, idempotencyKeys } from "@/lib/data";
+import {
+  ACPError,
+  type CartItem,
+  type CheckoutSession,
+  CreateCheckoutSessionSchema,
+  formatACPResponse,
+  handleIdempotencyKey,
+  storeIdempotencyKey,
+  validateACPRequest,
+} from "@/examples/basic/lib/acp-sdk";
+import { validateApiKey } from "@/examples/basic/lib/auth";
+import {
+  getProductById,
+  idempotencyKeys,
+  sessions,
+} from "@/examples/basic/lib/data";
 import {
   calculateTotals,
   generateSessionId,
   getAvailableShippingOptions,
   getExpirationTime,
-} from "@/lib/utils";
-import {
-  validateACPRequest,
-  formatACPResponse,
-  ACPError,
-  handleIdempotencyKey,
-  storeIdempotencyKey,
-  CreateCheckoutSessionSchema,
-  type CartItem,
-  type CheckoutSession,
-} from "@/lib/acp-sdk";
+} from "@/examples/basic/lib/utils";
 
 export async function POST(request: NextRequest) {
   // ============================================================================
@@ -35,7 +39,10 @@ export async function POST(request: NextRequest) {
   // 2. Parse and Validate Request with Zod
   // ============================================================================
 
-  const validation = await validateACPRequest(request, CreateCheckoutSessionSchema);
+  const validation = await validateACPRequest(
+    request,
+    CreateCheckoutSessionSchema,
+  );
 
   if (!validation.success) {
     return Response.json(validation.error, { status: validation.status });
@@ -59,7 +66,10 @@ export async function POST(request: NextRequest) {
   });
 
   if (idempotencyCheck.exists) {
-    return formatACPResponse({ session: idempotencyCheck.value }, { status: 200 });
+    return formatACPResponse(
+      { session: idempotencyCheck.value },
+      { status: 200 },
+    );
   }
 
   // ============================================================================

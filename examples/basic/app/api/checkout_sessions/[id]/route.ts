@@ -3,22 +3,21 @@
 // ACP Specification: https://developers.openai.com/commerce/specs/checkout
 
 import type { NextRequest } from "next/server";
-import { validateApiKey } from "@/lib/auth";
-import { getProductById, sessions } from "@/lib/data";
+import {
+  ACPError,
+  type CartItem,
+  type CheckoutSession,
+  formatACPResponse,
+  UpdateCheckoutSessionSchema,
+  validateACPRequest,
+} from "@/examples/basic/lib/acp-sdk";
+import { validateApiKey } from "@/examples/basic/lib/auth";
+import { getProductById, sessions } from "@/examples/basic/lib/data";
 import {
   calculateTotals,
   getAvailableShippingOptions,
   isSessionExpired,
-} from "@/lib/utils";
-import {
-  validateACPRequest,
-  formatACPResponse,
-  ACPError,
-  canTransitionState,
-  UpdateCheckoutSessionSchema,
-  type CartItem,
-  type CheckoutSession,
-} from "@/lib/acp-sdk";
+} from "@/examples/basic/lib/utils";
 
 // ============================================================================
 // GET - Retrieve Session
@@ -83,7 +82,10 @@ export async function POST(
   }
 
   // Parse and validate request
-  const validation = await validateACPRequest(request, UpdateCheckoutSessionSchema);
+  const validation = await validateACPRequest(
+    request,
+    UpdateCheckoutSessionSchema,
+  );
 
   if (!validation.success) {
     return Response.json(validation.error, { status: validation.status });

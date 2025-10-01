@@ -1,0 +1,31 @@
+{
+    "name": "@acp/sdk",
+    "version": "0.0.0-alpha.1",
+    "private": true,
+    "main": "index.ts",
+    "types": "index.ts",
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        ".": "./index.ts"
+    },
+    "scripts": {
+        "build": "tsc"
+    },
+    "dependencies": {
+        "zod": "^4.1.11"
+    },
+    "peerDependencies": {
+        "next": ">=15.5",
+        "hono": ">=4.9",
+        "redis": ">=5.8"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.2.0",
+        "@types/node": "^20",
+        "typescript": "^5",
+        "next": "^15.6.0-canary.34",
+        "hono": "^4.9.9",
+        "redis": "^5.8.2"
+    }
+}

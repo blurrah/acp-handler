@@ -1,14 +1,14 @@
-import { err, ok } from "./errors";
-import { canTransition } from "./fsm";
-import { HEADERS, parseHeaders } from "./headers";
-import { withIdempotency } from "./idempotency";
+import { err, ok } from "../core/errors";
+import { canTransition } from "../core/fsm";
+import { HEADERS, parseHeaders } from "../core/headers";
+import { withIdempotency } from "../core/idempotency";
 import type {
   CheckoutSession,
   CompleteCheckoutSessionRequest,
   CreateCheckoutSessionRequest,
   Order,
   UpdateCheckoutSessionRequest,
-} from "./types";
+} from "../core/types";
 
 type Catalog = {
   price(

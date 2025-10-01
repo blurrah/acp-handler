@@ -17,6 +17,7 @@
     "next": "15.6.0-canary.34",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "turbo": "^2.5.8",
     "zod": "^4.1.11"
   },
   "devDependencies": {
@@ -25,13 +26,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vercel/queue": "0.0.0-alpha.23",
-    "hono": "^4.9.9",
-    "json-schema-to-typescript": "^15.0.4",
-    "openapi-typescript": "^7.9.1",
-    "redis": "^5.8.2",
     "tailwindcss": "^4",
-    "ts-to-zod": "^4.0.1",
     "typescript": "^5"
   }
 }

@@ -20,7 +20,7 @@ export type OutboundConfig = {
  * Creates an outbound webhook sender with HMAC signing
  *
  * This is the baseline implementation. For production, consider:
- * - Wrapping with Next.js `unstable_after()` to avoid blocking responses
+ * - Wrapping with Next.js `after()` to avoid blocking responses
  * - Using a queue (Vercel Queues, Upstash, etc.) for retry logic
  * - Logging failures to a monitoring service
  */

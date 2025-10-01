@@ -19,9 +19,11 @@ cp .env.example .env.local
 ```
 
 Required environment variables:
+
 - `REDIS_URL` - Redis connection string
 
 Optional (for webhooks):
+
 - `OPENAI_WEBHOOK_URL` - Webhook endpoint from OpenAI dashboard
 - `OPENAI_WEBHOOK_SECRET` - Webhook signing secret from OpenAI
 - `NEXT_PUBLIC_URL` - Your public-facing URL
@@ -65,7 +67,7 @@ const psp = {
 const outbound = {
   orderUpdated: async (evt) => {
     // TODO: Implement webhook delivery
-    // Options: unstable_after(), Vercel Queues, Upstash, etc.
+    // Options: after(), Vercel Queues, Upstash, etc.
   },
 };
 

@@ -1,11 +1,10 @@
+import { after } from "next/server";
 import { createHandlers } from "@/sdk/core/handlers";
 import { createNextCatchAll } from "@/sdk/next";
 import { createStoreWithRedis } from "@/sdk/storage/redis";
 import { createOutboundWebhook } from "@/sdk/webhooks/outbound";
-import { unstable_after as after } from "next/server";
 
 // Not sure if needed
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Wire storage in one line
@@ -55,13 +54,14 @@ const psp = {
 };
 
 // Optional webhook configuration
-const webhook = process.env.OPENAI_WEBHOOK_URL
-  ? createOutboundWebhook({
-      webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-      secret: process.env.OPENAI_WEBHOOK_SECRET!,
-      merchantName: process.env.MERCHANT_NAME || "YourStore",
-    })
-  : null;
+const webhook =
+  process.env.OPENAI_WEBHOOK_URL && process.env.OPENAI_WEBHOOK_SECRET
+    ? createOutboundWebhook({
+        webhookUrl: process.env.OPENAI_WEBHOOK_URL,
+        secret: process.env.OPENAI_WEBHOOK_SECRET,
+        merchantName: process.env.MERCHANT_NAME || "YourStore",
+      })
+    : null;
 
 const outbound = {
   orderUpdated: async (evt: any) => {

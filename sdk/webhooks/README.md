@@ -8,7 +8,7 @@ The ACP protocol requires merchants to send webhook notifications when orders ar
 
 ## Implementation
 
-The baseline uses Next.js `unstable_after()` to send webhooks without blocking the response:
+The baseline uses Next.js `after()` to send webhooks without blocking the response:
 
 **Configure environment variables:**
 
@@ -24,7 +24,7 @@ NEXT_PUBLIC_URL=https://yourstore.com
 ```typescript
 import { createHandlers } from "@/sdk/core/handlers";
 import { createOutboundWebhook } from "@/sdk/webhooks/outbound";
-import { unstable_after as after } from "next/server";
+import { after } from "next/server";
 
 const webhook = createOutboundWebhook({
   webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
@@ -62,6 +62,7 @@ const handlers = createHandlers({ catalog, psp, store, outbound });
 For production deployments, consider:
 
 1. **Retry Logic**: The baseline implementation has no retries. Options:
+
    - Queue system (when Vercel Queues becomes available)
    - Store failures in database + cron job for retry
    - Third-party services (Upstash QStash, Inngest, etc.)
@@ -97,18 +98,21 @@ X-Timestamp: 1234567890
 ## Events
 
 ### `order_created`
+
 Sent when checkout completes successfully.
 
 ### `order_updated`
+
 Sent when order status changes (shipped, cancelled, refunded, etc.)
 
 ## Testing
 
 Use the Bruno collection to test the complete flow:
+
 1. Complete a checkout session
 2. Check your server logs to see webhook delivery
 3. Check OpenAI dashboard to verify receipt
 
 ## Future: Queue-Based Delivery
 
-Once Vercel Queues becomes generally available, this implementation will be updated to use queues for automatic retries and guaranteed delivery. For now, the `unstable_after()` approach works well for most use cases.
+Once Vercel Queues becomes generally available, this implementation will be updated to use queues for automatic retries and guaranteed delivery. For now, the `after()` approach works well for most use cases.

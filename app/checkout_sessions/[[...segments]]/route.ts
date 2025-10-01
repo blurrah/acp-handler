@@ -1,9 +1,4 @@
 import { createHandlers } from "@/sdk/core/handlers";
-import {
-  CompleteCheckoutSessionSchema,
-  CreateCheckoutSessionSchema,
-  UpdateCheckoutSessionSchema,
-} from "@/sdk/core/schema";
 import { createNextCatchAll } from "@/sdk/next";
 import { createStoreWithRedis } from "@/sdk/storage/redis";
 
@@ -67,10 +62,6 @@ const outbound = {
 const handlers = createHandlers({ catalog, psp, store, outbound });
 
 // Use SDK’s validated catch-all
-const { GET, POST } = createNextCatchAll(handlers, {
-  CreateCheckoutSessionSchema,
-  UpdateCheckoutSessionSchema,
-  CompleteCheckoutSessionSchema,
-});
+const { GET, POST } = createNextCatchAll(handlers);
 
 export { GET, POST };

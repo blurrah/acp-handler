@@ -8,12 +8,21 @@ export function createRedisKV(client?: RedisClientType, namespace = ""): KV {
   const redis = client ?? createClient({ url: process.env.REDIS_URL! });
   const key = (k: string) => (namespace ? `${namespace}:${k}` : k);
 
+  // Ensure connection is established
+  const ensureConnected = async () => {
+    if (!redis.isOpen) {
+      await redis.connect();
+    }
+  };
+
   return {
     async get(k) {
+      await ensureConnected();
       const v = await redis.get(key(k));
       return v;
     },
     async set(k, v, ttlSec) {
+      await ensureConnected();
       if (ttlSec) {
         await redis.set(key(k), v, { EX: ttlSec });
       } else {
@@ -21,6 +30,7 @@ export function createRedisKV(client?: RedisClientType, namespace = ""): KV {
       }
     },
     async setnx(k, v, ttlSec) {
+      await ensureConnected();
       if (ttlSec) {
         // Use SET NX EX atomically
         const res = await redis.set(key(k), v, { NX: true, EX: ttlSec });

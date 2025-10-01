@@ -27,18 +27,18 @@ export function createNextCatchAll<C, U, X>(
 ) {
   async function GET(
     req: NextRequest,
-    { params }: { params: { segments?: string[] } },
+    { params }: { params: Promise<{ segments?: string[] }> },
   ) {
-    const seg = params.segments ?? [];
+    const seg = (await params).segments ?? [];
     if (seg.length === 1) return H.get(req as unknown as Request, seg[0]!);
     return specError("not_found", "Route not found", undefined, 404);
   }
 
   async function POST(
     req: NextRequest,
-    { params }: { params: { segments?: string[] } },
+    { params }: { params: Promise<{ segments?: string[] }> },
   ) {
-    const seg = params.segments ?? [];
+    const seg = (await params).segments ?? [];
 
     // POST /checkout_sessions
     if (seg.length === 0) {

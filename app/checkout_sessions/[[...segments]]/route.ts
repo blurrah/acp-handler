@@ -54,7 +54,10 @@ const psp = {
 
 const outbound = {
   orderUpdated: async (_evt: any) => {
-    /* optional signed webhook */
+    // TODO: Implement webhook delivery
+    // See sdk/webhooks/README.md for examples:
+    // - Basic: unstable_after() with direct HTTP call
+    // - Production: Vercel Queues, Upstash QStash, or other queue
   },
 };
 

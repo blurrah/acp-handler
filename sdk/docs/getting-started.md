@@ -6,17 +6,32 @@ The ACP SDK provides everything you need to implement the Agentic Commerce Proto
 
 The SDK is currently part of this repository. Import from `@/sdk/*` in your Next.js app.
 
+### Required Packages
+
+```bash
+npm install redis
+```
+
+### Environment Setup
+
+```bash
+cp .env.example .env.local
+```
+
+Required environment variables:
+- `REDIS_URL` - Redis connection string
+
+Optional (for webhooks):
+- `OPENAI_WEBHOOK_URL` - Webhook endpoint from OpenAI dashboard
+- `OPENAI_WEBHOOK_SECRET` - Webhook signing secret from OpenAI
+- `NEXT_PUBLIC_URL` - Your public-facing URL
+
 ## Quick Start
 
 ```typescript
 import { createHandlers } from "@/sdk/core/handlers";
 import { createStoreWithRedis } from "@/sdk/storage/redis";
 import { createNextCatchAll } from "@/sdk/next";
-import {
-  CreateCheckoutSessionSchema,
-  UpdateCheckoutSessionSchema,
-  CompleteCheckoutSessionSchema,
-} from "@/sdk/core/schema";
 
 // 1. Set up storage
 const { store } = createStoreWithRedis("acp");
@@ -46,24 +61,23 @@ const psp = {
   capture: async (intent_id) => ({ ok: true }),
 };
 
+// 4. Set up webhooks (optional - see sdk/webhooks/README.md)
 const outbound = {
   orderUpdated: async (evt) => {
-    // Send webhooks to agent platforms
+    // TODO: Implement webhook delivery
+    // Options: unstable_after(), Vercel Queues, Upstash, etc.
   },
 };
 
-// 3. Create handlers
+// 5. Create handlers
 const handlers = createHandlers({ catalog, psp, store, outbound });
 
-// 4. Export Next.js route handlers
-export const { GET, POST } = createNextCatchAll(handlers, {
-  CreateCheckoutSessionSchema,
-  UpdateCheckoutSessionSchema,
-  CompleteCheckoutSessionSchema,
-});
+// 6. Export Next.js route handlers
+export const { GET, POST } = createNextCatchAll(handlers);
 ```
 
 ## Next Steps
 
 - [Core Concepts](./core-concepts.md) - Understand the architecture
 - [Adapters](./adapters.md) - Implement your business logic
+- [Webhooks](../webhooks/README.md) - Configure outbound webhooks

@@ -1,0 +1,26 @@
+meta {
+  name: 7. Error - Session Not Found
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/checkout_sessions/nonexistent_session_id_12345
+  body: none
+  auth: none
+}
+
+headers {
+  X-Request-ID: {{$randomUUID}}
+}
+
+tests {
+  test("should return 404", function() {
+    expect(res.status).to.equal(404);
+  });
+
+  test("should have error response", function() {
+    expect(res.body.error).to.exist;
+    expect(res.body.error.code).to.equal('session_not_found');
+  });
+}

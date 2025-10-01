@@ -1,0 +1,81 @@
+meta {
+  name: 1. Create Checkout Session
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/checkout_sessions
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Idempotency-Key: {{idempotency_key}}
+  X-Request-ID: {{request_id}}
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "id": "item_123",
+        "quantity": 2
+      },
+      {
+        "id": "item_456",
+        "quantity": 1
+      }
+    ],
+    "customer": {
+      "shipping_address": {
+        "name": "John Smith",
+        "line1": "1234 Chat Road",
+        "line2": "Apt 101",
+        "city": "San Francisco",
+        "region": "CA",
+        "postal_code": "94131",
+        "country": "US",
+        "email": "john@example.com",
+        "phone": "+15552003434"
+      }
+    },
+    "fulfillment": {
+      "selected_id": "std"
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 201 || res.status === 200) {
+    const data = res.body;
+    bru.setEnvVar("checkout_session_id", data.id);
+    console.log("Created checkout session:", data.id);
+    console.log("Status:", data.status);
+  }
+}
+
+tests {
+  test("should return 201 or 200", function() {
+    expect([200, 201]).to.include(res.status);
+  });
+
+  test("should have checkout session id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+
+  test("should have valid status", function() {
+    expect(['ready_for_payment', 'not_ready_for_payment']).to.include(res.body.status);
+  });
+
+  test("should have items", function() {
+    expect(res.body.items).to.be.an('array');
+    expect(res.body.items.length).to.be.greaterThan(0);
+  });
+
+  test("should have totals", function() {
+    expect(res.body.totals).to.be.an('object');
+    expect(res.body.totals.grand_total).to.exist;
+  });
+}

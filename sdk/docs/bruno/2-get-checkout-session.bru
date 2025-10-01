@@ -1,0 +1,33 @@
+meta {
+  name: 2. Get Checkout Session
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/checkout_sessions/{{checkout_session_id}}
+  body: none
+  auth: none
+}
+
+headers {
+  X-Request-ID: {{$randomUUID}}
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return correct session id", function() {
+    expect(res.body.id).to.equal(bru.getEnvVar("checkout_session_id"));
+  });
+
+  test("should have all required fields", function() {
+    expect(res.body.status).to.exist;
+    expect(res.body.items).to.be.an('array');
+    expect(res.body.totals).to.be.an('object');
+    expect(res.body.created_at).to.exist;
+    expect(res.body.updated_at).to.exist;
+  });
+}

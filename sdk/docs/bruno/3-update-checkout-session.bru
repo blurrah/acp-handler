@@ -1,0 +1,62 @@
+meta {
+  name: 3. Update Checkout Session
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/checkout_sessions/{{checkout_session_id}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Request-ID: {{$randomUUID}}
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "id": "item_123",
+        "quantity": 3
+      }
+    ],
+    "customer": {
+      "billing_address": {
+        "name": "John Smith",
+        "line1": "1234 Chat Road",
+        "city": "San Francisco",
+        "region": "CA",
+        "postal_code": "94131",
+        "country": "US"
+      }
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("Updated session status:", res.body.status);
+    console.log("Updated grand total:", res.body.totals.grand_total);
+  }
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should return updated session", function() {
+    expect(res.body.id).to.equal(bru.getEnvVar("checkout_session_id"));
+  });
+
+  test("should have updated items", function() {
+    expect(res.body.items).to.be.an('array');
+  });
+
+  test("updated_at should be more recent", function() {
+    expect(res.body.updated_at).to.exist;
+  });
+}

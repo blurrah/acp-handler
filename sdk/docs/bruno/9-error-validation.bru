@@ -1,0 +1,49 @@
+meta {
+  name: 9. Error - Validation Error
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{base_url}}/checkout_sessions
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Idempotency-Key: {{$randomUUID}}
+  X-Request-ID: {{$randomUUID}}
+}
+
+body:json {
+  {
+    "items": []
+  }
+}
+
+tests {
+  test("should return 400 or 422", function() {
+    expect([400, 422]).to.include(res.status);
+  });
+
+  test("should have validation error", function() {
+    expect(res.body.error).to.exist;
+    expect(res.body.error.code).to.equal('validation_error');
+  });
+
+  test("should indicate items field error", function() {
+    expect(res.body.error.param).to.exist;
+  });
+}
+
+docs {
+  # Validation Error Test
+
+  Tests validation by sending an empty items array.
+
+  Expected: 400 or 422 error with:
+  - error.code = "validation_error"
+  - error.param indicating the problematic field
+  - error.message describing the validation failure
+}

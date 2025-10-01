@@ -1,0 +1,58 @@
+meta {
+  name: 6. Idempotency Test (Same Key)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/checkout_sessions
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Idempotency-Key: test-idempotency-key-12345
+  X-Request-ID: {{$randomUUID}}
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "id": "item_999",
+        "quantity": 1
+      }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("Idempotent request - returned existing session");
+  } else if (res.status === 201) {
+    console.log("New session created");
+  }
+  console.log("Session ID:", res.body.id);
+}
+
+tests {
+  test("should return 200 or 201", function() {
+    expect([200, 201]).to.include(res.status);
+  });
+
+  test("should return checkout session", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}
+
+docs {
+  # Idempotency Test
+
+  Run this request multiple times with the same idempotency key.
+
+  - First request: Should return 201 (created)
+  - Subsequent requests: Should return 200 (existing session)
+
+  The session ID should remain the same across all requests.
+}

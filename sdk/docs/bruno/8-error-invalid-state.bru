@@ -1,0 +1,50 @@
+meta {
+  name: 8. Error - Invalid State Transition
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/checkout_sessions/{{checkout_session_id}}/complete
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Request-ID: {{$randomUUID}}
+}
+
+body:json {
+  {
+    "payment": {
+      "delegated_token": "spt_test_token"
+    }
+  }
+}
+
+tests {
+  test("should return error (session already completed or cancelled)", function() {
+    // This will fail if the session is already completed
+    expect([400, 422]).to.include(res.status);
+  });
+
+  test("should have error code", function() {
+    if (res.status !== 200) {
+      expect(res.body.error).to.exist;
+      expect(res.body.error.code).to.exist;
+    }
+  });
+}
+
+docs {
+  # Invalid State Transition Test
+
+  This tests error handling when trying to complete a session that's already been completed.
+
+  Prerequisites:
+  1. Run the complete flow (requests 1-4) first
+  2. Then run this request - it should fail because the session is already completed
+
+  Expected: 400 or 422 error with code "invalid_state"
+}

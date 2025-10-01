@@ -1,0 +1,61 @@
+meta {
+  name: 4. Complete Checkout Session
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/checkout_sessions/{{checkout_session_id}}/complete
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-Request-ID: {{$randomUUID}}
+}
+
+body:json {
+  {
+    "payment": {
+      "delegated_token": "spt_test_token_123456"
+    },
+    "customer": {
+      "billing_address": {
+        "name": "John Smith",
+        "line1": "1234 Chat Road",
+        "line2": "Apt 101",
+        "city": "San Francisco",
+        "region": "CA",
+        "postal_code": "94131",
+        "country": "US",
+        "email": "john@example.com",
+        "phone": "+15552003434"
+      }
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("Session completed!");
+    console.log("Order ID:", res.body.order?.id);
+    console.log("Status:", res.body.status);
+  }
+}
+
+tests {
+  test("should return 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("should have completed status", function() {
+    expect(res.body.status).to.equal('completed');
+  });
+
+  test("should have order details", function() {
+    expect(res.body.order).to.exist;
+    expect(res.body.order.id).to.be.a('string');
+    expect(res.body.order.checkout_session_id).to.equal(bru.getEnvVar("checkout_session_id"));
+  });
+}

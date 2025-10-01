@@ -1,6 +1,8 @@
 import { createHandlers } from "@/sdk/core/handlers";
 import { createNextCatchAll } from "@/sdk/next";
 import { createStoreWithRedis } from "@/sdk/storage/redis";
+import { createOutboundWebhook } from "@/sdk/webhooks/outbound";
+import { unstable_after as after } from "next/server";
 
 // Not sure if needed
 export const runtime = "nodejs";
@@ -52,12 +54,38 @@ const psp = {
   capture: async (_intentId: string) => ({ ok: true as const }),
 };
 
+// Optional webhook configuration
+const webhook = process.env.OPENAI_WEBHOOK_URL
+  ? createOutboundWebhook({
+      webhookUrl: process.env.OPENAI_WEBHOOK_URL,
+      secret: process.env.OPENAI_WEBHOOK_SECRET!,
+      merchantName: process.env.MERCHANT_NAME || "YourStore",
+    })
+  : null;
+
 const outbound = {
-  orderUpdated: async (_evt: any) => {
-    // TODO: Implement webhook delivery
-    // See sdk/webhooks/README.md for examples:
-    // - Basic: unstable_after() with direct HTTP call
-    // - Production: Vercel Queues, Upstash QStash, or other queue
+  orderUpdated: async (evt: any) => {
+    if (!webhook) return; // Webhooks not configured
+
+    // Send webhook after response (non-blocking)
+    after(async () => {
+      try {
+        await webhook.orderUpdated({
+          checkout_session_id: evt.checkout_session_id,
+          status: evt.status,
+          order: evt.order,
+          permalink_url: evt.order
+            ? `${process.env.NEXT_PUBLIC_URL}/orders/${evt.order.id}`
+            : undefined,
+        });
+        console.log(
+          `✓ Webhook sent: order_updated for ${evt.checkout_session_id}`,
+        );
+      } catch (error) {
+        console.error("✗ Webhook failed:", error);
+        // TODO: Log to monitoring service for retry
+      }
+    });
   },
 };
 

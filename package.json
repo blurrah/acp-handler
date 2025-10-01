@@ -25,6 +25,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vercel/queue": "0.0.0-alpha.23",
     "hono": "^4.9.9",
     "json-schema-to-typescript": "^15.0.4",
     "openapi-typescript": "^7.9.1",

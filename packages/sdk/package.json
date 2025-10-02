@@ -10,6 +10,14 @@
         ".": {
             "import": "./dist/index.js",
             "types": "./dist/index.d.ts"
+        },
+        "./checkout": {
+            "import": "./dist/checkout/index.js",
+            "types": "./dist/checkout/index.d.ts"
+        },
+        "./feeds": {
+            "import": "./dist/feeds/index.js",
+            "types": "./dist/feeds/index.d.ts"
         }
     },
     "scripts": {

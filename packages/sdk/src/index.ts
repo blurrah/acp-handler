@@ -1,3 +1,4 @@
+// TODO:s Clean this up and add individual exports in package.json
 export * from "./crypto";
 export * from "./errors";
 export * from "./fsm";
@@ -8,3 +9,4 @@ export * from "./next";
 export * from "./schema";
 export * from "./storage";
 export * from "./types";
+export { createOutboundWebhook } from "./webhooks/outbound";

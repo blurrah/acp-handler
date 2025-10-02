@@ -11,10 +11,11 @@ import type {
 } from "./types.ts";
 
 type Products = {
-	price(
-		items: Array<{ id: string; quantity: number }>,
-		ctx: any,
-	): Promise<{
+	price(input: {
+		items: Array<{ id: string; quantity: number }>;
+		customer?: CheckoutSession["customer"];
+		fulfillment?: CheckoutSession["fulfillment"];
+	}): Promise<{
 		items: CheckoutSession["items"];
 		totals: CheckoutSession["totals"];
 		fulfillment?: CheckoutSession["fulfillment"];
@@ -67,7 +68,8 @@ export function createHandlers(deps: {
 			const H = parseHeaders(req);
 			const idek = H.idempotencyKey;
 			const compute = async (): Promise<CheckoutSession> => {
-				const quote = await products.price(body.items, {
+				const quote = await products.price({
+					items: body.items,
 					customer: body.customer,
 					fulfillment: body.fulfillment,
 				});
@@ -118,7 +120,8 @@ export function createHandlers(deps: {
 			// Merge updates
 			const items =
 				body.items ?? s.items.map(({ id, quantity }) => ({ id, quantity }));
-			const quote = await products.price(items, {
+			const quote = await products.price({
+				items,
 				customer: body.customer ?? s.customer,
 				fulfillment: body.fulfillment ?? s.fulfillment,
 			});

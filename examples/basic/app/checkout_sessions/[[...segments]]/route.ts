@@ -13,9 +13,13 @@ export const dynamic = "force-dynamic";
 const { store } = createStoreWithRedis("acp"); // uses process.env.REDIS_URL
 
 // Minimal adapters (replace with your real logic)
-const catalog = {
-	price: async (items: Array<{ id: string; quantity: number }>, ctx: any) => {
-		const mapped = items.map((i) => ({
+const products = {
+	price: async (input: {
+		items: Array<{ id: string; quantity: number }>;
+		customer?: any;
+		fulfillment?: any;
+	}) => {
+		const mapped = input.items.map((i) => ({
 			id: i.id,
 			title: `Item ${i.id}`,
 			quantity: i.quantity,
@@ -39,7 +43,7 @@ const catalog = {
 						price: { amount: 0, currency: "EUR" },
 					},
 				],
-				selected_id: ctx?.fulfillment?.selected_id ?? "std",
+				selected_id: input.fulfillment?.selected_id ?? "std",
 			},
 			messages: [],
 			ready: true,
@@ -47,7 +51,7 @@ const catalog = {
 	},
 };
 
-const psp = {
+const payments = {
 	authorize: async ({ session, delegated_token }: any) => {
 		const intentId = `pi_${crypto.randomUUID()}`; // TODO: call PSP with delegated_token
 		return { ok: true as const, intent_id: intentId };
@@ -65,7 +69,7 @@ const webhook =
 			})
 		: null;
 
-const outbound = {
+const webhooks = {
 	orderUpdated: async (evt: any) => {
 		if (!webhook) return; // Webhooks not configured
 
@@ -92,7 +96,10 @@ const outbound = {
 };
 
 // Build protocol handlers from SDK
-const handlers = createHandlers({ catalog, psp, store, outbound });
+const handlers = createHandlers(
+	{ products, payments, webhooks },
+	{ store },
+);
 
 // Use SDK’s validated catch-all
 const { GET, POST } = createNextCatchAll(handlers);

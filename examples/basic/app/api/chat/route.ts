@@ -1,4 +1,3 @@
-import { openai } from "@ai-sdk/openai";
 import { streamText, tool } from "ai";
 import { z } from "zod";
 
@@ -8,7 +7,7 @@ export async function POST(req: Request) {
 	const { messages } = await req.json();
 
 	const result = streamText({
-		model: openai("gpt-4o"),
+		model: "openai/gpt-5",
 		messages,
 		tools: {
 			create_checkout_session: tool({

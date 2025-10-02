@@ -1,6 +1,29 @@
 {
     "name": "acp-handler",
-    "version": "0.0.0-alpha.4",
+    "version": "0.0.0-alpha.5",
+    "description": "TypeScript SDK for implementing the Agentic Commerce Protocol (ACP) - build checkout APIs that AI agents like ChatGPT can use to complete purchases",
+    "license": "MIT",
+    "author": "Boris Besemer <borisbesemer@gmail.com>",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/blurrah/agentic-commerce-protocol-template.git",
+        "directory": "packages/sdk"
+    },
+    "homepage": "https://github.com/blurrah/agentic-commerce-protocol-template#readme",
+    "bugs": {
+        "url": "https://github.com/blurrah/agentic-commerce-protocol-template/issues"
+    },
+    "keywords": [
+        "acp",
+        "agentic-commerce",
+        "commerce",
+        "checkout",
+        "ai",
+        "chatgpt",
+        "openai",
+        "typescript",
+        "sdk"
+    ],
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "type": "module",

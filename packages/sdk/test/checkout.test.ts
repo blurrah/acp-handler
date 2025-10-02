@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createHandlers } from "../src/checkout/handlers";
 import {
 	createMemoryStore,
-	createMockProducts,
 	createMockPayments,
+	createMockProducts,
 	createMockWebhooks,
 	createRequest,
 } from "./helpers";
@@ -21,10 +21,7 @@ describe("Checkout Integration", () => {
 		webhooks = createMockWebhooks();
 		store = createMemoryStore();
 
-		handlers = createHandlers(
-			{ products, payments, webhooks },
-			{ store },
-		);
+		handlers = createHandlers({ products, payments, webhooks }, { store });
 	});
 
 	describe("Complete checkout flow", () => {
@@ -70,14 +67,22 @@ describe("Checkout Integration", () => {
 
 			const updateRes = await handlers.update(updateReq, session.id, {
 				customer: {
-					email: "test@example.com",
-					name: "Test User",
+					billing_address: {
+						email: "test@example.com",
+						name: "Test User",
+						line1: "123 Main St",
+						city: "Anytown",
+						postal_code: "12345",
+						country: "US",
+					},
 				},
 			});
 
 			expect(updateRes.status).toBe(200);
 			const updatedSession = await updateRes.json();
-			expect(updatedSession.customer?.email).toBe("test@example.com");
+			expect(updatedSession.customer?.billing_address?.email).toBe(
+				"test@example.com",
+			);
 
 			// 3. Complete checkout
 			const completeReq = createRequest(
@@ -227,10 +232,7 @@ describe("Checkout Integration", () => {
 				authorizeReason: "Card declined",
 			});
 
-			handlers = createHandlers(
-				{ products, payments, webhooks },
-				{ store },
-			);
+			handlers = createHandlers({ products, payments, webhooks }, { store });
 
 			// Create session
 			const createReq = createRequest("http://test/checkout_sessions", {

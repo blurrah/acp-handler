@@ -100,7 +100,7 @@ export function createHandlers(
 				if (sigErr) return sigErr;
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
-				span?.setAttribute("idempotency_key", idek);
+				idek && span?.setAttribute("idempotency_key", idek);
 
 				const compute = async (): Promise<CheckoutSession> => {
 					const quote = await traced(
@@ -117,9 +117,7 @@ export function createHandlers(
 
 					const session: CheckoutSession = {
 						id: crypto.randomUUID(),
-						status: quote.ready
-							? "ready_for_payment"
-							: "not_ready_for_payment",
+						status: quote.ready ? "ready_for_payment" : "not_ready_for_payment",
 						items: quote.items,
 						totals: quote.totals,
 						fulfillment: quote.fulfillment,
@@ -133,12 +131,9 @@ export function createHandlers(
 					span?.setAttribute("session_id", session.id);
 					span?.setAttribute("session_status", session.status);
 
-					await traced(
-						tracer,
-						"session.put",
-						() => sessions.put(session),
-						{ session_id: session.id },
-					);
+					await traced(tracer, "session.put", () => sessions.put(session), {
+						session_id: session.id,
+					});
 					return session;
 				};
 
@@ -169,7 +164,7 @@ export function createHandlers(
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("session_id", id);
-				span?.setAttribute("idempotency_key", idek);
+				idek && span?.setAttribute("idempotency_key", idek);
 
 				const compute = async (): Promise<CheckoutSession> => {
 					const s = await traced(
@@ -221,12 +216,9 @@ export function createHandlers(
 
 					span?.setAttribute("session_status", next.status);
 
-					await traced(
-						tracer,
-						"session.put",
-						() => sessions.put(next),
-						{ session_id: next.id },
-					);
+					await traced(tracer, "session.put", () => sessions.put(next), {
+						session_id: next.id,
+					});
 					return next;
 				};
 
@@ -241,7 +233,10 @@ export function createHandlers(
 
 					return ok(value, {
 						status: 200,
-						echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+						echo: {
+							[HEADERS.IDEMPOTENCY]: idek,
+							[HEADERS.REQ_ID]: H.requestId,
+						},
 					});
 				} catch (e: any) {
 					const parsed = JSON.parse(e.message);
@@ -268,7 +263,7 @@ export function createHandlers(
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("session_id", id);
-				span?.setAttribute("idempotency_key", idek);
+				idek && span?.setAttribute("idempotency_key", idek);
 
 				const compute = async () => {
 					const s = await traced(
@@ -354,12 +349,9 @@ export function createHandlers(
 						updated_at: new Date().toISOString(),
 					};
 
-					await traced(
-						tracer,
-						"session.put",
-						() => sessions.put(completed),
-						{ session_id: completed.id },
-					);
+					await traced(tracer, "session.put", () => sessions.put(completed), {
+						session_id: completed.id,
+					});
 
 					const order: Order = {
 						id: auth.intent_id,
@@ -393,7 +385,10 @@ export function createHandlers(
 
 					return ok(value, {
 						status: 200,
-						echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+						echo: {
+							[HEADERS.IDEMPOTENCY]: idek,
+							[HEADERS.REQ_ID]: H.requestId,
+						},
 					});
 				} catch (e: any) {
 					const parsed = JSON.parse(e.message);
@@ -410,7 +405,7 @@ export function createHandlers(
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("session_id", id);
-				span?.setAttribute("idempotency_key", idek);
+				idek && span?.setAttribute("idempotency_key", idek);
 
 				const compute = async (): Promise<CheckoutSession> => {
 					const s = await traced(
@@ -447,12 +442,9 @@ export function createHandlers(
 						updated_at: new Date().toISOString(),
 					};
 
-					await traced(
-						tracer,
-						"session.put",
-						() => sessions.put(next),
-						{ session_id: next.id },
-					);
+					await traced(tracer, "session.put", () => sessions.put(next), {
+						session_id: next.id,
+					});
 
 					await traced(
 						tracer,
@@ -479,7 +471,10 @@ export function createHandlers(
 
 					return ok(value, {
 						status: 200,
-						echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+						echo: {
+							[HEADERS.IDEMPOTENCY]: idek,
+							[HEADERS.REQ_ID]: H.requestId,
+						},
 					});
 				} catch (e: any) {
 					const parsed = JSON.parse(e.message);
@@ -502,12 +497,9 @@ export function createHandlers(
 				const H = parseHeaders(req);
 				span?.setAttribute("session_id", id);
 
-				const s = await traced(
-					tracer,
-					"session.get",
-					() => sessions.get(id),
-					{ session_id: id },
-				);
+				const s = await traced(tracer, "session.get", () => sessions.get(id), {
+					session_id: id,
+				});
 
 				if (!s)
 					return err(

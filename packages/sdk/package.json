@@ -1,6 +1,6 @@
 {
     "name": "acp-handler",
-    "version": "0.0.0-alpha.3",
+    "version": "0.0.0-alpha.4",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "type": "module",
@@ -22,7 +22,8 @@
     "scripts": {
         "build": "tsdown",
         "test": "vitest",
-        "test:watch": "vitest --watch"
+        "test:watch": "vitest --watch",
+        "prepublishOnly": "cp ../../README.md README.md"
     },
     "dependencies": {
         "zod": "^4.1.11"

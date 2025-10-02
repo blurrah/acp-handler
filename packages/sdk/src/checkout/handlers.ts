@@ -10,7 +10,7 @@ import type {
 	UpdateCheckoutSessionRequest,
 } from "./types.ts";
 
-type Catalog = {
+type Products = {
 	price(
 		items: Array<{ id: string; quantity: number }>,
 		ctx: any,
@@ -23,7 +23,7 @@ type Catalog = {
 	}>;
 };
 
-type PSP = {
+type Payments = {
 	// Delegated token (recommended path) or other payment handles
 	authorize(input: {
 		session: CheckoutSession;
@@ -34,7 +34,7 @@ type PSP = {
 	): Promise<{ ok: true } | { ok: false; reason: string }>;
 };
 
-type Outbound = {
+type Webhooks = {
 	// Merchant → Agent platform webhook emitter (signed)
 	orderUpdated(evt: {
 		checkout_session_id: string;
@@ -54,12 +54,12 @@ type Store = {
 };
 
 export function createHandlers(deps: {
-	catalog: Catalog;
-	psp: PSP;
+	products: Products;
+	payments: Payments;
 	store: Store;
-	outbound: Outbound;
+	webhooks: Webhooks;
 }) {
-	const { catalog, psp, store, outbound } = deps;
+	const { products, payments, store, webhooks } = deps;
 
 	return {
 		// POST /checkout_sessions
@@ -67,7 +67,7 @@ export function createHandlers(deps: {
 			const H = parseHeaders(req);
 			const idek = H.idempotencyKey;
 			const compute = async (): Promise<CheckoutSession> => {
-				const quote = await catalog.price(body.items, {
+				const quote = await products.price(body.items, {
 					customer: body.customer,
 					fulfillment: body.fulfillment,
 				});
@@ -118,7 +118,7 @@ export function createHandlers(deps: {
 			// Merge updates
 			const items =
 				body.items ?? s.items.map(({ id, quantity }) => ({ id, quantity }));
-			const quote = await catalog.price(items, {
+			const quote = await products.price(items, {
 				customer: body.customer ?? s.customer,
 				fulfillment: body.fulfillment ?? s.fulfillment,
 			});
@@ -166,13 +166,13 @@ export function createHandlers(deps: {
 				);
 
 			// authorize & capture
-			const auth = await psp.authorize({
+			const auth = await payments.authorize({
 				session: s,
 				delegated_token: body.payment?.delegated_token,
 			});
 			if (!auth.ok) return err("payment_authorization_failed", auth.reason);
 
-			const cap = await psp.capture(auth.intent_id);
+			const cap = await payments.capture(auth.intent_id);
 			if (!cap.ok) return err("payment_capture_failed", cap.reason);
 
 			const can = canTransition(s.status, "completed");
@@ -190,7 +190,7 @@ export function createHandlers(deps: {
 				checkout_session_id: s.id,
 				status: "placed",
 			};
-			await outbound.orderUpdated({
+			await webhooks.orderUpdated({
 				checkout_session_id: s.id,
 				status: "completed",
 				order,
@@ -224,7 +224,7 @@ export function createHandlers(deps: {
 				updated_at: new Date().toISOString(),
 			};
 			await store.putSession(next);
-			await outbound.orderUpdated({
+			await webhooks.orderUpdated({
 				checkout_session_id: s.id,
 				status: "canceled",
 			});

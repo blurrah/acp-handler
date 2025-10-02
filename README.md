@@ -237,6 +237,40 @@ const { store } = createStoreWithRedis('namespace');
 
 ## Advanced Features
 
+### Signature Verification
+
+Verify that requests are actually from OpenAI/ChatGPT and haven't been tampered with:
+
+```typescript
+import { createHandlers } from '@acp/sdk/checkout';
+
+const handlers = createHandlers(
+  { products, payments, webhooks },
+  {
+    store,
+    signature: {
+      secret: process.env.OPENAI_WEBHOOK_SECRET, // Provided by OpenAI
+      toleranceSec: 300 // Optional: 5 minutes default
+    }
+  }
+);
+```
+
+**How it works:**
+- HMAC-SHA256 signature verification
+- Protects against unauthorized requests
+- Prevents replay attacks (timestamp must be recent)
+- Constant-time comparison (timing attack protection)
+
+**Returns 401 if:**
+- Signature header is missing
+- Timestamp header is missing
+- Signature doesn't match
+- Request is too old (replay attack)
+- Body has been tampered with
+
+**Optional:** Signature verification is disabled by default for easier development. Enable it in production by providing the `signature` config.
+
 ### Idempotency
 
 Automatically handles idempotency for all POST operations to prevent double-charging:

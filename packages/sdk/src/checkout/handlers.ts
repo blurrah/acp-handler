@@ -3,6 +3,8 @@ import { err, ok } from "./errors.ts";
 import { canTransition } from "./fsm.ts";
 import { HEADERS, parseHeaders } from "./headers.ts";
 import { withIdempotency } from "./idempotency.ts";
+import type { SignatureConfig } from "./signature.ts";
+import { verifySignature } from "./signature.ts";
 import type { KV } from "./storage.ts";
 import { sessionStore } from "./storage.ts";
 import { traced } from "./tracing.ts";
@@ -57,17 +59,45 @@ export function createHandlers(
 	options: {
 		store: KV;
 		tracer?: Tracer;
+		signature?: SignatureConfig;
 	},
 ) {
 	const { products, payments, webhooks } = handlers;
 	const sessions = sessionStore(options.store);
 	const idempotency = options.store;
-	const { tracer } = options;
+	const { tracer, signature } = options;
+
+	/**
+	 * Verify request signature if configured
+	 * Returns error response if verification fails
+	 */
+	async function checkSignature(req: Request): Promise<Response | null> {
+		if (!signature) return null; // Signature verification disabled
+
+		// Clone request since body can only be read once
+		const cloned = req.clone();
+		const isValid = await verifySignature(cloned, signature);
+
+		if (!isValid) {
+			return err(
+				"invalid_signature",
+				"Request signature verification failed",
+				undefined,
+				"authentication_error",
+				401,
+			);
+		}
+
+		return null;
+	}
 
 	return {
 		// POST /checkout_sessions
 		create: async (req: Request, body: CreateCheckoutSessionRequest) =>
 			traced(tracer, "checkout.create", async (span) => {
+				// Verify signature first
+				const sigErr = await checkSignature(req);
+				if (sigErr) return sigErr;
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("idempotency_key", idek);
@@ -133,6 +163,9 @@ export function createHandlers(
 			body: UpdateCheckoutSessionRequest,
 		) =>
 			traced(tracer, "checkout.update", async (span) => {
+				// Verify signature first
+				const sigErr = await checkSignature(req);
+				if (sigErr) return sigErr;
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("session_id", id);
@@ -229,6 +262,9 @@ export function createHandlers(
 			body: CompleteCheckoutSessionRequest,
 		) =>
 			traced(tracer, "checkout.complete", async (span) => {
+				// Verify signature first
+				const sigErr = await checkSignature(req);
+				if (sigErr) return sigErr;
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("session_id", id);
@@ -368,6 +404,9 @@ export function createHandlers(
 		// POST /checkout_sessions/:id/cancel
 		cancel: async (req: Request, id: string) =>
 			traced(tracer, "checkout.cancel", async (span) => {
+				// Verify signature first
+				const sigErr = await checkSignature(req);
+				if (sigErr) return sigErr;
 				const H = parseHeaders(req);
 				const idek = H.idempotencyKey;
 				span?.setAttribute("session_id", id);
@@ -457,6 +496,9 @@ export function createHandlers(
 		// GET /checkout_sessions/:id
 		get: async (req: Request, id: string) =>
 			traced(tracer, "checkout.get", async (span) => {
+				// Verify signature first
+				const sigErr = await checkSignature(req);
+				if (sigErr) return sigErr;
 				const H = parseHeaders(req);
 				span?.setAttribute("session_id", id);
 

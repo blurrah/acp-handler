@@ -105,41 +105,67 @@ export function createHandlers(
 			body: UpdateCheckoutSessionRequest,
 		) => {
 			const H = parseHeaders(req);
-			const s = await sessions.get(id);
-			if (!s)
+			const idek = H.idempotencyKey;
+
+			const compute = async (): Promise<CheckoutSession> => {
+				const s = await sessions.get(id);
+				if (!s)
+					throw new Error(
+						JSON.stringify({
+							code: "session_not_found",
+							message: `Session "${id}" not found`,
+							param: "checkout_session_id",
+							type: "invalid_request_error",
+						}),
+					);
+
+				// Merge updates
+				const items =
+					body.items ?? s.items.map(({ id, quantity }) => ({ id, quantity }));
+				const quote = await products.price({
+					items,
+					customer: body.customer ?? s.customer,
+					fulfillment: body.fulfillment ?? s.fulfillment,
+				});
+
+				const next: CheckoutSession = {
+					...s,
+					items: quote.items,
+					totals: quote.totals,
+					fulfillment: quote.fulfillment,
+					customer: body.customer ?? s.customer,
+					messages: quote.messages,
+					status: quote.ready
+						? s.status === "not_ready_for_payment"
+							? "ready_for_payment"
+							: s.status
+						: "not_ready_for_payment",
+					updated_at: new Date().toISOString(),
+				};
+				await sessions.put(next);
+				return next;
+			};
+
+			try {
+				const { reused, value } = await withIdempotency(
+					idek,
+					idempotency,
+					compute,
+				);
+				return ok(value, {
+					status: 200,
+					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+				});
+			} catch (e: any) {
+				const parsed = JSON.parse(e.message);
 				return err(
-					"session_not_found",
-					`Session "${id}" not found`,
-					"checkout_session_id",
-					"invalid_request_error",
+					parsed.code,
+					parsed.message,
+					parsed.param,
+					parsed.type,
 					404,
 				);
-
-			// Merge updates
-			const items =
-				body.items ?? s.items.map(({ id, quantity }) => ({ id, quantity }));
-			const quote = await products.price({
-				items,
-				customer: body.customer ?? s.customer,
-				fulfillment: body.fulfillment ?? s.fulfillment,
-			});
-
-			const next: CheckoutSession = {
-				...s,
-				items: quote.items,
-				totals: quote.totals,
-				fulfillment: quote.fulfillment,
-				customer: body.customer ?? s.customer,
-				messages: quote.messages,
-				status: quote.ready
-					? s.status === "not_ready_for_payment"
-						? "ready_for_payment"
-						: s.status
-					: "not_ready_for_payment",
-				updated_at: new Date().toISOString(),
-			};
-			await sessions.put(next);
-			return ok(next, { status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } });
+			}
 		},
 
 		// POST /checkout_sessions/:id/complete
@@ -149,88 +175,164 @@ export function createHandlers(
 			body: CompleteCheckoutSessionRequest,
 		) => {
 			const H = parseHeaders(req);
-			const s = await sessions.get(id);
-			if (!s)
-				return err(
-					"session_not_found",
-					`Session "${id}" not found`,
-					"checkout_session_id",
-					"invalid_request_error",
-					404,
-				);
+			const idek = H.idempotencyKey;
 
-			if (s.status !== "ready_for_payment")
-				return err(
-					"invalid_state",
-					`Cannot complete from "${s.status}"`,
-					"status",
-				);
+			const compute = async () => {
+				const s = await sessions.get(id);
+				if (!s)
+					throw new Error(
+						JSON.stringify({
+							code: "session_not_found",
+							message: `Session "${id}" not found`,
+							param: "checkout_session_id",
+							type: "invalid_request_error",
+						}),
+					);
 
-			// authorize & capture
-			const auth = await payments.authorize({
-				session: s,
-				delegated_token: body.payment?.delegated_token,
-			});
-			if (!auth.ok) return err("payment_authorization_failed", auth.reason);
+				if (s.status !== "ready_for_payment")
+					throw new Error(
+						JSON.stringify({
+							code: "invalid_state",
+							message: `Cannot complete from "${s.status}"`,
+							param: "status",
+							type: "invalid_request_error",
+						}),
+					);
 
-			const cap = await payments.capture(auth.intent_id);
-			if (!cap.ok) return err("payment_capture_failed", cap.reason);
+				// authorize & capture
+				const auth = await payments.authorize({
+					session: s,
+					delegated_token: body.payment?.delegated_token,
+				});
+				if (!auth.ok)
+					throw new Error(
+						JSON.stringify({
+							code: "payment_authorization_failed",
+							message: auth.reason,
+							type: "invalid_request_error",
+						}),
+					);
 
-			const can = canTransition(s.status, "completed");
-			if (can !== true) return err("invalid_state", can.error, "status");
+				const cap = await payments.capture(auth.intent_id);
+				if (!cap.ok)
+					throw new Error(
+						JSON.stringify({
+							code: "payment_capture_failed",
+							message: cap.reason,
+							type: "invalid_request_error",
+						}),
+					);
 
-			const completed: CheckoutSession = {
-				...s,
-				status: "completed",
-				updated_at: new Date().toISOString(),
+				const can = canTransition(s.status, "completed");
+				if (can !== true)
+					throw new Error(
+						JSON.stringify({
+							code: "invalid_state",
+							message: can.error,
+							param: "status",
+							type: "invalid_request_error",
+						}),
+					);
+
+				const completed: CheckoutSession = {
+					...s,
+					status: "completed",
+					updated_at: new Date().toISOString(),
+				};
+				await sessions.put(completed);
+
+				const order: Order = {
+					id: auth.intent_id,
+					checkout_session_id: s.id,
+					status: "placed",
+				};
+				await webhooks.orderUpdated({
+					checkout_session_id: s.id,
+					status: "completed",
+					order,
+				});
+
+				return { ...completed, order };
 			};
-			await sessions.put(completed);
 
-			const order: Order = {
-				id: auth.intent_id,
-				checkout_session_id: s.id,
-				status: "placed",
-			};
-			await webhooks.orderUpdated({
-				checkout_session_id: s.id,
-				status: "completed",
-				order,
-			});
-
-			return ok(
-				{ ...completed, order },
-				{ status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } },
-			);
+			try {
+				const { reused, value } = await withIdempotency(
+					idek,
+					idempotency,
+					compute,
+				);
+				return ok(value, {
+					status: 200,
+					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+				});
+			} catch (e: any) {
+				const parsed = JSON.parse(e.message);
+				return err(parsed.code, parsed.message, parsed.param, parsed.type);
+			}
 		},
 
 		// POST /checkout_sessions/:id/cancel
 		cancel: async (req: Request, id: string) => {
 			const H = parseHeaders(req);
-			const s = await sessions.get(id);
-			if (!s)
+			const idek = H.idempotencyKey;
+
+			const compute = async (): Promise<CheckoutSession> => {
+				const s = await sessions.get(id);
+				if (!s)
+					throw new Error(
+						JSON.stringify({
+							code: "session_not_found",
+							message: `Session "${id}" not found`,
+							param: "checkout_session_id",
+							type: "invalid_request_error",
+						}),
+					);
+
+				const can = canTransition(s.status, "canceled");
+				if (can !== true)
+					throw new Error(
+						JSON.stringify({
+							code: "invalid_state",
+							message: can.error,
+							param: "status",
+							type: "invalid_request_error",
+						}),
+					);
+
+				const next: CheckoutSession = {
+					...s,
+					status: "canceled",
+					updated_at: new Date().toISOString(),
+				};
+				await sessions.put(next);
+				await webhooks.orderUpdated({
+					checkout_session_id: s.id,
+					status: "canceled",
+				});
+
+				return next;
+			};
+
+			try {
+				const { reused, value } = await withIdempotency(
+					idek,
+					idempotency,
+					compute,
+				);
+				return ok(value, {
+					status: 200,
+					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+				});
+			} catch (e: any) {
+				const parsed = JSON.parse(e.message);
 				return err(
-					"session_not_found",
-					`Session "${id}" not found`,
-					"checkout_session_id",
-					"invalid_request_error",
+					parsed.code,
+					parsed.message,
+					parsed.param,
+					parsed.type,
 					404,
 				);
-
-			const can = canTransition(s.status, "canceled");
-			if (can !== true) return err("invalid_state", can.error, "status");
-
-			const next: CheckoutSession = {
-				...s,
-				status: "canceled",
-				updated_at: new Date().toISOString(),
-			};
-			await sessions.put(next);
-			await webhooks.orderUpdated({
-				checkout_session_id: s.id,
-				status: "canceled",
-			});
-
-			return ok(next, { status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } });
+			}
 		},
 
 		// GET /checkout_sessions/:id

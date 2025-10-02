@@ -409,7 +409,7 @@ Contributions welcome! Please open an issue or PR.
 
 ## License
 
-Apache 2.0
+MIT
 
 ---
 

@@ -7,9 +7,10 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "biome check",
-    "format": "biome format --write",
+    "format": "biome format --write"
   },
   "dependencies": {
+    "@acp/sdk": "workspace:*",
     "next": "15.6.0-canary.34",
     "react": "19.1.0",
     "react-dom": "19.1.0",

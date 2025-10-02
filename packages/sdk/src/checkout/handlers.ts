@@ -2,6 +2,8 @@ import { err, ok } from "./errors.ts";
 import { canTransition } from "./fsm.ts";
 import { HEADERS, parseHeaders } from "./headers.ts";
 import { withIdempotency } from "./idempotency.ts";
+import type { KV } from "./storage.ts";
+import { sessionStore } from "./storage.ts";
 import type {
 	CheckoutSession,
 	CompleteCheckoutSessionRequest,
@@ -44,23 +46,19 @@ type Webhooks = {
 	}): Promise<void>;
 };
 
-type Store = {
-	getSession(id: string): Promise<CheckoutSession | null>;
-	putSession(s: CheckoutSession): Promise<void>;
-	idem: {
-		get(k: string): Promise<string | null>;
-		setnx(k: string, v: string, ttlSec: number): Promise<boolean>;
-		set?(k: string, v: string, ttlSec: number): Promise<void>;
-	};
-};
-
-export function createHandlers(deps: {
-	products: Products;
-	payments: Payments;
-	store: Store;
-	webhooks: Webhooks;
-}) {
-	const { products, payments, store, webhooks } = deps;
+export function createHandlers(
+	handlers: {
+		products: Products;
+		payments: Payments;
+		webhooks: Webhooks;
+	},
+	options: {
+		store: KV;
+	},
+) {
+	const { products, payments, webhooks } = handlers;
+	const sessions = sessionStore(options.store);
+	const idempotency = options.store;
 
 	return {
 		// POST /checkout_sessions
@@ -85,13 +83,13 @@ export function createHandlers(deps: {
 					updated_at: new Date().toISOString(),
 					links: {},
 				};
-				await store.putSession(session);
+				await sessions.put(session);
 				return session;
 			};
 
 			const { reused, value } = await withIdempotency(
 				idek,
-				store.idem,
+				idempotency,
 				compute,
 			);
 			return ok<CheckoutSession>(value, {
@@ -107,7 +105,7 @@ export function createHandlers(deps: {
 			body: UpdateCheckoutSessionRequest,
 		) => {
 			const H = parseHeaders(req);
-			const s = await store.getSession(id);
+			const s = await sessions.get(id);
 			if (!s)
 				return err(
 					"session_not_found",
@@ -140,7 +138,7 @@ export function createHandlers(deps: {
 					: "not_ready_for_payment",
 				updated_at: new Date().toISOString(),
 			};
-			await store.putSession(next);
+			await sessions.put(next);
 			return ok(next, { status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } });
 		},
 
@@ -151,7 +149,7 @@ export function createHandlers(deps: {
 			body: CompleteCheckoutSessionRequest,
 		) => {
 			const H = parseHeaders(req);
-			const s = await store.getSession(id);
+			const s = await sessions.get(id);
 			if (!s)
 				return err(
 					"session_not_found",
@@ -186,7 +184,7 @@ export function createHandlers(deps: {
 				status: "completed",
 				updated_at: new Date().toISOString(),
 			};
-			await store.putSession(completed);
+			await sessions.put(completed);
 
 			const order: Order = {
 				id: auth.intent_id,
@@ -208,7 +206,7 @@ export function createHandlers(deps: {
 		// POST /checkout_sessions/:id/cancel
 		cancel: async (req: Request, id: string) => {
 			const H = parseHeaders(req);
-			const s = await store.getSession(id);
+			const s = await sessions.get(id);
 			if (!s)
 				return err(
 					"session_not_found",
@@ -226,7 +224,7 @@ export function createHandlers(deps: {
 				status: "canceled",
 				updated_at: new Date().toISOString(),
 			};
-			await store.putSession(next);
+			await sessions.put(next);
 			await webhooks.orderUpdated({
 				checkout_session_id: s.id,
 				status: "canceled",
@@ -238,7 +236,7 @@ export function createHandlers(deps: {
 		// GET /checkout_sessions/:id
 		get: async (req: Request, id: string) => {
 			const H = parseHeaders(req);
-			const s = await store.getSession(id);
+			const s = await sessions.get(id);
 			if (!s)
 				return err(
 					"session_not_found",

@@ -27,12 +27,19 @@
         "zod": "^4.1.11"
     },
     "peerDependencies": {
+        "@opentelemetry/api": ">=1.0.0",
         "hono": ">=4.9",
         "next": ">=15.5",
         "redis": ">=5.8"
     },
+    "peerDependenciesMeta": {
+        "@opentelemetry/api": {
+            "optional": true
+        }
+    },
     "devDependencies": {
         "@biomejs/biome": "2.2.0",
+        "@opentelemetry/api": "^1.9.0",
         "@types/node": "^20",
         "hono": "^4.9.9",
         "next": "^15.6.0-canary.34",

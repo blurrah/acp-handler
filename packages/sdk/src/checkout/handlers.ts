@@ -1,9 +1,11 @@
+import type { Tracer } from "@opentelemetry/api";
 import { err, ok } from "./errors.ts";
 import { canTransition } from "./fsm.ts";
 import { HEADERS, parseHeaders } from "./headers.ts";
 import { withIdempotency } from "./idempotency.ts";
 import type { KV } from "./storage.ts";
 import { sessionStore } from "./storage.ts";
+import { traced } from "./tracing.ts";
 import type {
 	CheckoutSession,
 	CompleteCheckoutSessionRequest,
@@ -54,300 +56,429 @@ export function createHandlers(
 	},
 	options: {
 		store: KV;
+		tracer?: Tracer;
 	},
 ) {
 	const { products, payments, webhooks } = handlers;
 	const sessions = sessionStore(options.store);
 	const idempotency = options.store;
+	const { tracer } = options;
 
 	return {
 		// POST /checkout_sessions
-		create: async (req: Request, body: CreateCheckoutSessionRequest) => {
-			const H = parseHeaders(req);
-			const idek = H.idempotencyKey;
-			const compute = async (): Promise<CheckoutSession> => {
-				const quote = await products.price({
-					items: body.items,
-					customer: body.customer,
-					fulfillment: body.fulfillment,
-				});
-				const session: CheckoutSession = {
-					id: crypto.randomUUID(),
-					status: quote.ready ? "ready_for_payment" : "not_ready_for_payment",
-					items: quote.items,
-					totals: quote.totals,
-					fulfillment: quote.fulfillment,
-					customer: body.customer,
-					messages: quote.messages,
-					created_at: new Date().toISOString(),
-					updated_at: new Date().toISOString(),
-					links: {},
-				};
-				await sessions.put(session);
-				return session;
-			};
+		create: async (req: Request, body: CreateCheckoutSessionRequest) =>
+			traced(tracer, "checkout.create", async (span) => {
+				const H = parseHeaders(req);
+				const idek = H.idempotencyKey;
+				span?.setAttribute("idempotency_key", idek);
 
-			const { reused, value } = await withIdempotency(
-				idek,
-				idempotency,
-				compute,
-			);
-			return ok<CheckoutSession>(value, {
-				status: reused ? 200 : 201,
-				echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
-			});
-		},
+				const compute = async (): Promise<CheckoutSession> => {
+					const quote = await traced(
+						tracer,
+						"products.price",
+						() =>
+							products.price({
+								items: body.items,
+								customer: body.customer,
+								fulfillment: body.fulfillment,
+							}),
+						{ items_count: body.items.length.toString() },
+					);
+
+					const session: CheckoutSession = {
+						id: crypto.randomUUID(),
+						status: quote.ready
+							? "ready_for_payment"
+							: "not_ready_for_payment",
+						items: quote.items,
+						totals: quote.totals,
+						fulfillment: quote.fulfillment,
+						customer: body.customer,
+						messages: quote.messages,
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+						links: {},
+					};
+
+					span?.setAttribute("session_id", session.id);
+					span?.setAttribute("session_status", session.status);
+
+					await traced(
+						tracer,
+						"session.put",
+						() => sessions.put(session),
+						{ session_id: session.id },
+					);
+					return session;
+				};
+
+				const { reused, value } = await withIdempotency(
+					idek,
+					idempotency,
+					compute,
+				);
+
+				span?.setAttribute("idempotency_reused", reused.toString());
+
+				return ok<CheckoutSession>(value, {
+					status: reused ? 200 : 201,
+					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+				});
+			}),
 
 		// POST /checkout_sessions/:id
 		update: async (
 			req: Request,
 			id: string,
 			body: UpdateCheckoutSessionRequest,
-		) => {
-			const H = parseHeaders(req);
-			const idek = H.idempotencyKey;
+		) =>
+			traced(tracer, "checkout.update", async (span) => {
+				const H = parseHeaders(req);
+				const idek = H.idempotencyKey;
+				span?.setAttribute("session_id", id);
+				span?.setAttribute("idempotency_key", idek);
 
-			const compute = async (): Promise<CheckoutSession> => {
-				const s = await sessions.get(id);
-				if (!s)
-					throw new Error(
-						JSON.stringify({
-							code: "session_not_found",
-							message: `Session "${id}" not found`,
-							param: "checkout_session_id",
-							type: "invalid_request_error",
-						}),
+				const compute = async (): Promise<CheckoutSession> => {
+					const s = await traced(
+						tracer,
+						"session.get",
+						() => sessions.get(id),
+						{ session_id: id },
 					);
 
-				// Merge updates
-				const items =
-					body.items ?? s.items.map(({ id, quantity }) => ({ id, quantity }));
-				const quote = await products.price({
-					items,
-					customer: body.customer ?? s.customer,
-					fulfillment: body.fulfillment ?? s.fulfillment,
-				});
+					if (!s)
+						throw new Error(
+							JSON.stringify({
+								code: "session_not_found",
+								message: `Session "${id}" not found`,
+								param: "checkout_session_id",
+								type: "invalid_request_error",
+							}),
+						);
 
-				const next: CheckoutSession = {
-					...s,
-					items: quote.items,
-					totals: quote.totals,
-					fulfillment: quote.fulfillment,
-					customer: body.customer ?? s.customer,
-					messages: quote.messages,
-					status: quote.ready
-						? s.status === "not_ready_for_payment"
-							? "ready_for_payment"
-							: s.status
-						: "not_ready_for_payment",
-					updated_at: new Date().toISOString(),
+					// Merge updates
+					const items =
+						body.items ?? s.items.map(({ id, quantity }) => ({ id, quantity }));
+					const quote = await traced(
+						tracer,
+						"products.price",
+						() =>
+							products.price({
+								items,
+								customer: body.customer ?? s.customer,
+								fulfillment: body.fulfillment ?? s.fulfillment,
+							}),
+						{ items_count: items.length.toString() },
+					);
+
+					const next: CheckoutSession = {
+						...s,
+						items: quote.items,
+						totals: quote.totals,
+						fulfillment: quote.fulfillment,
+						customer: body.customer ?? s.customer,
+						messages: quote.messages,
+						status: quote.ready
+							? s.status === "not_ready_for_payment"
+								? "ready_for_payment"
+								: s.status
+							: "not_ready_for_payment",
+						updated_at: new Date().toISOString(),
+					};
+
+					span?.setAttribute("session_status", next.status);
+
+					await traced(
+						tracer,
+						"session.put",
+						() => sessions.put(next),
+						{ session_id: next.id },
+					);
+					return next;
 				};
-				await sessions.put(next);
-				return next;
-			};
 
-			try {
-				const { reused, value } = await withIdempotency(
-					idek,
-					idempotency,
-					compute,
-				);
-				return ok(value, {
-					status: 200,
-					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
-				});
-			} catch (e: any) {
-				const parsed = JSON.parse(e.message);
-				return err(
-					parsed.code,
-					parsed.message,
-					parsed.param,
-					parsed.type,
-					404,
-				);
-			}
-		},
+				try {
+					const { reused, value } = await withIdempotency(
+						idek,
+						idempotency,
+						compute,
+					);
+
+					span?.setAttribute("idempotency_reused", reused.toString());
+
+					return ok(value, {
+						status: 200,
+						echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+					});
+				} catch (e: any) {
+					const parsed = JSON.parse(e.message);
+					return err(
+						parsed.code,
+						parsed.message,
+						parsed.param,
+						parsed.type,
+						404,
+					);
+				}
+			}),
 
 		// POST /checkout_sessions/:id/complete
 		complete: async (
 			req: Request,
 			id: string,
 			body: CompleteCheckoutSessionRequest,
-		) => {
-			const H = parseHeaders(req);
-			const idek = H.idempotencyKey;
+		) =>
+			traced(tracer, "checkout.complete", async (span) => {
+				const H = parseHeaders(req);
+				const idek = H.idempotencyKey;
+				span?.setAttribute("session_id", id);
+				span?.setAttribute("idempotency_key", idek);
 
-			const compute = async () => {
-				const s = await sessions.get(id);
-				if (!s)
-					throw new Error(
-						JSON.stringify({
-							code: "session_not_found",
-							message: `Session "${id}" not found`,
-							param: "checkout_session_id",
-							type: "invalid_request_error",
-						}),
+				const compute = async () => {
+					const s = await traced(
+						tracer,
+						"session.get",
+						() => sessions.get(id),
+						{ session_id: id },
 					);
 
-				if (s.status !== "ready_for_payment")
-					throw new Error(
-						JSON.stringify({
-							code: "invalid_state",
-							message: `Cannot complete from "${s.status}"`,
-							param: "status",
-							type: "invalid_request_error",
-						}),
+					if (!s)
+						throw new Error(
+							JSON.stringify({
+								code: "session_not_found",
+								message: `Session "${id}" not found`,
+								param: "checkout_session_id",
+								type: "invalid_request_error",
+							}),
+						);
+
+					if (s.status !== "ready_for_payment")
+						throw new Error(
+							JSON.stringify({
+								code: "invalid_state",
+								message: `Cannot complete from "${s.status}"`,
+								param: "status",
+								type: "invalid_request_error",
+							}),
+						);
+
+					// authorize & capture
+					const auth = await traced(
+						tracer,
+						"payments.authorize",
+						() =>
+							payments.authorize({
+								session: s,
+								delegated_token: body.payment?.delegated_token,
+							}),
+						{ session_id: s.id },
 					);
 
-				// authorize & capture
-				const auth = await payments.authorize({
-					session: s,
-					delegated_token: body.payment?.delegated_token,
-				});
-				if (!auth.ok)
-					throw new Error(
-						JSON.stringify({
-							code: "payment_authorization_failed",
-							message: auth.reason,
-							type: "invalid_request_error",
-						}),
+					if (!auth.ok)
+						throw new Error(
+							JSON.stringify({
+								code: "payment_authorization_failed",
+								message: auth.reason,
+								type: "invalid_request_error",
+							}),
+						);
+
+					span?.setAttribute("payment_intent_id", auth.intent_id);
+
+					const cap = await traced(
+						tracer,
+						"payments.capture",
+						() => payments.capture(auth.intent_id),
+						{ intent_id: auth.intent_id },
 					);
 
-				const cap = await payments.capture(auth.intent_id);
-				if (!cap.ok)
-					throw new Error(
-						JSON.stringify({
-							code: "payment_capture_failed",
-							message: cap.reason,
-							type: "invalid_request_error",
-						}),
+					if (!cap.ok)
+						throw new Error(
+							JSON.stringify({
+								code: "payment_capture_failed",
+								message: cap.reason,
+								type: "invalid_request_error",
+							}),
+						);
+
+					const can = canTransition(s.status, "completed");
+					if (can !== true)
+						throw new Error(
+							JSON.stringify({
+								code: "invalid_state",
+								message: can.error,
+								param: "status",
+								type: "invalid_request_error",
+							}),
+						);
+
+					const completed: CheckoutSession = {
+						...s,
+						status: "completed",
+						updated_at: new Date().toISOString(),
+					};
+
+					await traced(
+						tracer,
+						"session.put",
+						() => sessions.put(completed),
+						{ session_id: completed.id },
 					);
 
-				const can = canTransition(s.status, "completed");
-				if (can !== true)
-					throw new Error(
-						JSON.stringify({
-							code: "invalid_state",
-							message: can.error,
-							param: "status",
-							type: "invalid_request_error",
-						}),
+					const order: Order = {
+						id: auth.intent_id,
+						checkout_session_id: s.id,
+						status: "placed",
+					};
+
+					await traced(
+						tracer,
+						"webhooks.orderUpdated",
+						() =>
+							webhooks.orderUpdated({
+								checkout_session_id: s.id,
+								status: "completed",
+								order,
+							}),
+						{ session_id: s.id, order_id: order.id },
 					);
 
-				const completed: CheckoutSession = {
-					...s,
-					status: "completed",
-					updated_at: new Date().toISOString(),
+					return { ...completed, order };
 				};
-				await sessions.put(completed);
 
-				const order: Order = {
-					id: auth.intent_id,
-					checkout_session_id: s.id,
-					status: "placed",
-				};
-				await webhooks.orderUpdated({
-					checkout_session_id: s.id,
-					status: "completed",
-					order,
-				});
+				try {
+					const { reused, value } = await withIdempotency(
+						idek,
+						idempotency,
+						compute,
+					);
 
-				return { ...completed, order };
-			};
+					span?.setAttribute("idempotency_reused", reused.toString());
 
-			try {
-				const { reused, value } = await withIdempotency(
-					idek,
-					idempotency,
-					compute,
-				);
-				return ok(value, {
-					status: 200,
-					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
-				});
-			} catch (e: any) {
-				const parsed = JSON.parse(e.message);
-				return err(parsed.code, parsed.message, parsed.param, parsed.type);
-			}
-		},
+					return ok(value, {
+						status: 200,
+						echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+					});
+				} catch (e: any) {
+					const parsed = JSON.parse(e.message);
+					return err(parsed.code, parsed.message, parsed.param, parsed.type);
+				}
+			}),
 
 		// POST /checkout_sessions/:id/cancel
-		cancel: async (req: Request, id: string) => {
-			const H = parseHeaders(req);
-			const idek = H.idempotencyKey;
+		cancel: async (req: Request, id: string) =>
+			traced(tracer, "checkout.cancel", async (span) => {
+				const H = parseHeaders(req);
+				const idek = H.idempotencyKey;
+				span?.setAttribute("session_id", id);
+				span?.setAttribute("idempotency_key", idek);
 
-			const compute = async (): Promise<CheckoutSession> => {
-				const s = await sessions.get(id);
-				if (!s)
-					throw new Error(
-						JSON.stringify({
-							code: "session_not_found",
-							message: `Session "${id}" not found`,
-							param: "checkout_session_id",
-							type: "invalid_request_error",
-						}),
+				const compute = async (): Promise<CheckoutSession> => {
+					const s = await traced(
+						tracer,
+						"session.get",
+						() => sessions.get(id),
+						{ session_id: id },
 					);
 
-				const can = canTransition(s.status, "canceled");
-				if (can !== true)
-					throw new Error(
-						JSON.stringify({
-							code: "invalid_state",
-							message: can.error,
-							param: "status",
-							type: "invalid_request_error",
-						}),
+					if (!s)
+						throw new Error(
+							JSON.stringify({
+								code: "session_not_found",
+								message: `Session "${id}" not found`,
+								param: "checkout_session_id",
+								type: "invalid_request_error",
+							}),
+						);
+
+					const can = canTransition(s.status, "canceled");
+					if (can !== true)
+						throw new Error(
+							JSON.stringify({
+								code: "invalid_state",
+								message: can.error,
+								param: "status",
+								type: "invalid_request_error",
+							}),
+						);
+
+					const next: CheckoutSession = {
+						...s,
+						status: "canceled",
+						updated_at: new Date().toISOString(),
+					};
+
+					await traced(
+						tracer,
+						"session.put",
+						() => sessions.put(next),
+						{ session_id: next.id },
 					);
 
-				const next: CheckoutSession = {
-					...s,
-					status: "canceled",
-					updated_at: new Date().toISOString(),
+					await traced(
+						tracer,
+						"webhooks.orderUpdated",
+						() =>
+							webhooks.orderUpdated({
+								checkout_session_id: s.id,
+								status: "canceled",
+							}),
+						{ session_id: s.id },
+					);
+
+					return next;
 				};
-				await sessions.put(next);
-				await webhooks.orderUpdated({
-					checkout_session_id: s.id,
-					status: "canceled",
-				});
 
-				return next;
-			};
+				try {
+					const { reused, value } = await withIdempotency(
+						idek,
+						idempotency,
+						compute,
+					);
 
-			try {
-				const { reused, value } = await withIdempotency(
-					idek,
-					idempotency,
-					compute,
-				);
-				return ok(value, {
-					status: 200,
-					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
-				});
-			} catch (e: any) {
-				const parsed = JSON.parse(e.message);
-				return err(
-					parsed.code,
-					parsed.message,
-					parsed.param,
-					parsed.type,
-					404,
-				);
-			}
-		},
+					span?.setAttribute("idempotency_reused", reused.toString());
+
+					return ok(value, {
+						status: 200,
+						echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
+					});
+				} catch (e: any) {
+					const parsed = JSON.parse(e.message);
+					return err(
+						parsed.code,
+						parsed.message,
+						parsed.param,
+						parsed.type,
+						404,
+					);
+				}
+			}),
 
 		// GET /checkout_sessions/:id
-		get: async (req: Request, id: string) => {
-			const H = parseHeaders(req);
-			const s = await sessions.get(id);
-			if (!s)
-				return err(
-					"session_not_found",
-					`Session "${id}" not found`,
-					"checkout_session_id",
-					"invalid_request_error",
-					404,
+		get: async (req: Request, id: string) =>
+			traced(tracer, "checkout.get", async (span) => {
+				const H = parseHeaders(req);
+				span?.setAttribute("session_id", id);
+
+				const s = await traced(
+					tracer,
+					"session.get",
+					() => sessions.get(id),
+					{ session_id: id },
 				);
-			return ok(s, { status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } });
-		},
+
+				if (!s)
+					return err(
+						"session_not_found",
+						`Session "${id}" not found`,
+						"checkout_session_id",
+						"invalid_request_error",
+						404,
+					);
+
+				span?.setAttribute("session_status", s.status);
+
+				return ok(s, { status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } });
+			}),
 	};
 }

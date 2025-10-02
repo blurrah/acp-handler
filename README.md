@@ -4,7 +4,7 @@ A TypeScript SDK for implementing the [Agentic Commerce Protocol](https://develo
 
 ## What is ACP?
 
-The Agentic Commerce Protocol is an open standard that enables AI agents to complete purchases on behalf of users. This SDK handles the protocol implementation so you can focus on your business logic.
+An open standard for programmatic commerce flows between buyers, AI agents, and businesses. This SDK handles the protocol implementation so you can focus on your business logic.
 
 **Key Features:**
 - ✅ Full ACP spec compliance

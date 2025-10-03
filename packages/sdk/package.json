@@ -1,6 +1,6 @@
 {
 	"name": "acp-handler",
-	"version": "0.0.0-alpha.5",
+	"version": "0.0.0-alpha.6",
 	"description": "TypeScript SDK for implementing the Agentic Commerce Protocol (ACP) - build checkout APIs that AI agents like ChatGPT can use to complete purchases",
 	"license": "MIT",
 	"author": "Boris Besemer <borisbesemer@gmail.com>",

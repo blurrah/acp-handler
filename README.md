@@ -146,8 +146,9 @@ Hono natively supports Web Standard APIs, so no adapter needed:
 // server.ts
 import { Hono } from 'hono';
 import { handlers } from './checkout-handlers';
-import { parseJSON, validateBody } from 'acp-handler';
 import {
+  parseJSON,
+  validateBody,
   CreateCheckoutSessionSchema,
   UpdateCheckoutSessionSchema,
   CompleteCheckoutSessionSchema,
@@ -205,8 +206,9 @@ pnpm add @whatwg-node/server
 import express from 'express';
 import { createServerAdapter } from '@whatwg-node/server';
 import { handlers } from './checkout-handlers';
-import { parseJSON, validateBody } from 'acp-handler';
 import {
+  parseJSON,
+  validateBody,
   CreateCheckoutSessionSchema,
   UpdateCheckoutSessionSchema,
   CompleteCheckoutSessionSchema,

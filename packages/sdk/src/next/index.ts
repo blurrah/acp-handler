@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
 import type { z } from "zod";
-import { parseJSON, specError } from "../http";
+import { parseJSON, specError } from "../checkout/http";
 import {
 	CompleteCheckoutSessionSchema as DefaultCompleteCheckoutSessionSchema,
 	CreateCheckoutSessionSchema as DefaultCreateCheckoutSessionSchema,
 	UpdateCheckoutSessionSchema as DefaultUpdateCheckoutSessionSchema,
 	validateBody,
-} from "../schema";
+} from "../checkout/schema";
 
 export function handler(fn: (req: Request) => Promise<Response>) {
 	return async (req: NextRequest) => fn(req as unknown as Request);

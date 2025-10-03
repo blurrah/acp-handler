@@ -1,3 +1,2 @@
-// Re-export checkout for convenience
-// Users can import from "acp-handler" or "acp-handler/checkout"
+// Re-export all checkout functionality from main entry
 export * from "./checkout";

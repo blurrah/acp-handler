@@ -46,12 +46,10 @@ pnpm dev                     # Start Next.js example app
 ### Core Package: `packages/sdk/`
 
 #### Module Exports
-The SDK has dedicated export paths to minimize bundle size:
-- `acp-handler` - Main entry (checkout handlers)
-- `acp-handler/checkout` - Checkout implementation
-- `acp-handler/next` - Next.js catch-all route adapter
-- `acp-handler/test` - Test utilities
-- `acp-handler/feeds` - Product feeds (planned)
+The SDK has dedicated export paths:
+- `acp-handler` - Main entry (all checkout functionality)
+- `acp-handler/next` - Next.js catch-all route helper
+- `acp-handler/test` - Test utilities and mocks
 
 #### Key Components
 

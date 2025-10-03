@@ -77,9 +77,11 @@ The SDK has dedicated export paths to minimize bundle size:
 
 **`src/checkout/storage.ts`** - Storage abstraction
 - `KV` interface: `get()`, `set()`, `setnx()` (atomic operations)
-- `sessionStore()` wrapper: namespaces keys, handles JSON serialization
+- `SessionStore` interface: `get()`, `put()` for session persistence
+- `createRedisSessionStore()` helper: default Redis-backed session storage
 - Session TTL: 24 hours default
 - Redis adapter in `src/checkout/storage/redis.ts`
+- Sessions are optional - users can provide custom `SessionStore` implementation
 
 **`src/checkout/signature.ts`** - Request verification
 - HMAC-SHA256 signature validation
@@ -93,7 +95,7 @@ The SDK has dedicated export paths to minimize bundle size:
 - Status types: `CheckoutSessionStatus`
 
 #### User-Provided Handlers
-Users must implement three handler interfaces:
+Users must implement three handler interfaces (and optionally a fourth):
 
 1. **`Products`** - Pricing engine
    - `price()` method calculates items, totals, fulfillment options
@@ -109,6 +111,12 @@ Users must implement three handler interfaces:
    - `orderUpdated()` - Notify AI agent about status changes
    - Called after complete/cancel operations
    - Helper in `src/checkout/webhooks/outbound.ts` for signing
+
+4. **`Sessions`** (optional) - Custom session storage
+   - Defaults to Redis-backed storage using the provided `store`
+   - Can be overridden for platform integrations (Shopify, commercetools, etc.)
+   - Allows single source of truth in existing cart systems
+   - See `docs/session-storage.md` for detailed examples
 
 #### Framework Adapters
 
@@ -145,8 +153,9 @@ All operations are idempotent via the `Idempotency-Key` header.
 Before any status change, `canTransition(from, to)` validates the FSM rules. Invalid transitions return 400 errors with detailed messages.
 
 ### Storage Keys
-- Sessions: `acp:session:{id}` (24h TTL)
+- Sessions: `acp:session:{id}` (24h TTL) - when using default Redis storage
 - Idempotency: `{idempotency_key}` (1h TTL)
+- Note: Custom session stores can use any storage mechanism (Shopify, DB, etc.)
 
 ### Error Handling
 Structured errors with:

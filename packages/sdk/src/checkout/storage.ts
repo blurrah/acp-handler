@@ -6,7 +6,28 @@ export interface KV {
 	setnx(key: string, value: string, ttlSec?: number): Promise<boolean>;
 }
 
-export function sessionStore(kv: KV, ns = "acp") {
+export interface SessionStore {
+	get(id: string): Promise<CheckoutSession | null>;
+	put(session: CheckoutSession, ttlSec?: number): Promise<void>;
+}
+
+/**
+ * Creates a Redis-backed session store.
+ * This is the default session storage implementation.
+ *
+ * @param kv - Key-value store (Redis recommended)
+ * @param ns - Namespace for session keys (default: "acp")
+ * @returns SessionStore implementation
+ *
+ * @example
+ * ```typescript
+ * import { createStoreWithRedis, createRedisSessionStore } from 'acp-handler';
+ *
+ * const { store } = createStoreWithRedis('acp');
+ * const sessions = createRedisSessionStore(store, 'acp');
+ * ```
+ */
+export function createRedisSessionStore(kv: KV, ns = "acp"): SessionStore {
 	const K = (id: string) => `${ns}:session:${id}`;
 	return {
 		async get(id: string): Promise<CheckoutSession | null> {
@@ -22,3 +43,8 @@ export function sessionStore(kv: KV, ns = "acp") {
 		},
 	};
 }
+
+/**
+ * @deprecated Use createRedisSessionStore instead
+ */
+export const sessionStore = createRedisSessionStore;

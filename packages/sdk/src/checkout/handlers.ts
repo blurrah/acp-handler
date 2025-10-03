@@ -5,8 +5,8 @@ import { HEADERS, parseHeaders } from "./headers.ts";
 import { withIdempotency } from "./idempotency.ts";
 import type { SignatureConfig } from "./signature.ts";
 import { verifySignature } from "./signature.ts";
-import type { KV } from "./storage.ts";
-import { sessionStore } from "./storage.ts";
+import type { KV, SessionStore } from "./storage.ts";
+import { createRedisSessionStore } from "./storage.ts";
 import { traced } from "./tracing.ts";
 import type {
 	CheckoutSession,
@@ -55,6 +55,7 @@ export function createHandlers(
 		products: Products;
 		payments: Payments;
 		webhooks: Webhooks;
+		sessions?: SessionStore;
 	},
 	options: {
 		store: KV;
@@ -63,7 +64,8 @@ export function createHandlers(
 	},
 ) {
 	const { products, payments, webhooks } = handlers;
-	const sessions = sessionStore(options.store);
+	// Use provided session store or default to Redis-backed store
+	const sessions = handlers.sessions ?? createRedisSessionStore(options.store);
 	const idempotency = options.store;
 	const { tracer, signature } = options;
 

@@ -2,16 +2,15 @@
   "name": "acp-template",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "biome check",
-    "format": "biome format --write",
-    "generate:checkout:get": "curl https://raw.githubusercontent.com/agentic-commerce-protocol/agentic-commerce-protocol/refs/heads/main/spec/json-schema/schema.agentic_checkout.json -o temp/schema.agentic_checkout.json",
-    "generate:checkout:convert": "json2ts temp/schema.agentic_checkout.json types/agentic_checkout.ts --unreachableDefinitions",
-    "generate:checkout:zod": "ts-to-zod types/agentic_checkout.ts types/agentic_checkout.zod.ts",
-    "generate:checkout": "pnpm run generate:checkout:get && pnpm run generate:checkout:convert && pnpm run generate:checkout:zod"
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "vitest",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "format": "turbo format",
+    "format:fix": "turbo format:fix"
   },
   "dependencies": {
     "next": "15.6.0-canary.34",
@@ -27,6 +26,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
-    "typescript": "^5"
-  }
+    "typescript": "^5",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.16.1"
 }

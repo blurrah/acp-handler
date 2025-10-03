@@ -1,5 +1,5 @@
-import type { CheckoutSession } from "../checkout/types";
 import type { KV } from "../checkout/storage";
+import type { CheckoutSession } from "../checkout/types";
 
 /**
  * In-memory KV store for testing

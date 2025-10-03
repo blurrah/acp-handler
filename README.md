@@ -1,10 +1,10 @@
-# Agentic Commerce Protocol SDK
+# acp-handler
 
-A TypeScript SDK for implementing the [Agentic Commerce Protocol](https://developers.openai.com/commerce) (ACP) in your e-commerce application. Build checkout APIs that AI agents like ChatGPT can use to complete purchases.
+A TypeScript handler for implementing the [Agentic Commerce Protocol](https://developers.openai.com/commerce) (ACP) in your web application. Handle ACP checkout requests with built-in idempotency, signature verification, and OpenTelemetry tracing.
 
 ## What is ACP?
 
-An open standard for programmatic commerce flows between buyers, AI agents, and businesses. This SDK handles the protocol implementation so you can focus on your business logic.
+An open standard for programmatic commerce flows between buyers, AI agents, and businesses. This package handles the protocol implementation so you can focus on your business logic.
 
 **Key Features:**
 - ✅ Full ACP spec compliance
@@ -18,12 +18,12 @@ An open standard for programmatic commerce flows between buyers, AI agents, and 
 ## Installation
 
 ```bash
-pnpm add @acp/sdk
+pnpm add acp-handler
 ```
 
 ### Peer Dependencies
 
-The SDK requires a key-value store for session storage. Redis is recommended:
+The handler requires a key-value store for session storage. Redis is recommended:
 
 ```bash
 pnpm add redis
@@ -40,7 +40,7 @@ pnpm add hono  # For Hono
 ### 1. Implement Required Handlers
 
 ```typescript
-import { createHandlers } from '@acp/sdk/checkout';
+import { createHandlers } from 'acp-handler/checkout';
 
 const handlers = createHandlers(
   {
@@ -132,7 +132,7 @@ const handlers = createHandlers(
 
 ```typescript
 // app/checkout_sessions/[[...segments]]/route.ts
-import { createNextCatchAll } from '@acp/sdk/checkout/next';
+import { createNextCatchAll } from 'acp-handler/checkout/next';
 
 const { GET, POST } = createNextCatchAll(handlers);
 
@@ -144,7 +144,7 @@ export { GET, POST };
 ```typescript
 // server.ts
 import { Hono } from 'hono';
-import { handler } from '@acp/sdk/checkout/hono';
+import { handler } from 'acp-handler/checkout/hono';
 
 const app = new Hono();
 
@@ -230,7 +230,7 @@ type KV = {
 
 **Built-in Redis adapter:**
 ```typescript
-import { createStoreWithRedis } from '@acp/sdk/checkout';
+import { createStoreWithRedis } from 'acp-handler/checkout';
 
 const { store } = createStoreWithRedis('namespace');
 ```
@@ -242,7 +242,7 @@ const { store } = createStoreWithRedis('namespace');
 Verify that requests are actually from OpenAI/ChatGPT and haven't been tampered with:
 
 ```typescript
-import { createHandlers } from '@acp/sdk/checkout';
+import { createHandlers } from 'acp-handler/checkout';
 
 const handlers = createHandlers(
   { products, payments, webhooks },
@@ -276,7 +276,7 @@ const handlers = createHandlers(
 Automatically handles idempotency for all POST operations to prevent double-charging:
 
 ```typescript
-// SDK automatically handles this
+// Automatically handled by acp-handler
 POST /checkout_sessions/:id/complete
 Headers:
   Idempotency-Key: idem_abc123
@@ -313,10 +313,10 @@ const handlers = createHandlers(
 
 ### Testing
 
-The SDK provides test helpers for integration testing:
+The package provides test helpers for integration testing:
 
 ```typescript
-import { createMemoryStore, createMockProducts } from '@acp/sdk/test';
+import { createMemoryStore, createMockProducts } from 'acp-handler/test';
 
 const handlers = createHandlers(
   {
@@ -372,7 +372,7 @@ Creates checkout handlers implementing the ACP spec.
 Creates Next.js catch-all route handlers.
 
 ```typescript
-import { createNextCatchAll } from '@acp/sdk/checkout/next';
+import { createNextCatchAll } from 'acp-handler/checkout/next';
 
 const { GET, POST } = createNextCatchAll(handlers);
 export { GET, POST };
@@ -383,7 +383,7 @@ export { GET, POST };
 Creates a Redis-backed KV store.
 
 ```typescript
-import { createStoreWithRedis } from '@acp/sdk/checkout';
+import { createStoreWithRedis } from 'acp-handler/checkout';
 
 // Uses REDIS_URL environment variable
 const { store } = createStoreWithRedis('acp');
@@ -394,7 +394,7 @@ const { store } = createStoreWithRedis('acp');
 Helper for signing outbound webhooks to ChatGPT.
 
 ```typescript
-import { createOutboundWebhook } from '@acp/sdk/checkout';
+import { createOutboundWebhook } from 'acp-handler/checkout';
 
 const webhook = createOutboundWebhook({
   webhookUrl: process.env.OPENAI_WEBHOOK_URL,
@@ -414,7 +414,7 @@ await webhook.orderUpdated({
 ```
 agentic-commerce-protocol-template/
 ├── packages/
-│   └── sdk/                    # Main SDK package
+│   └── sdk/                    # acp-handler package
 │       ├── src/
 │       │   ├── checkout/       # Checkout implementation
 │       │   │   ├── handlers.ts # Core business logic

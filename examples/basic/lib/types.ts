@@ -21,7 +21,7 @@ export interface Product {
 
 export interface CheckoutSession {
   id: string;
-  status: 'open' | 'completed' | 'cancelled' | 'expired';
+  status: "open" | "completed" | "cancelled" | "expired";
   created_at: string; // ISO 8601 timestamp
   expires_at: string; // ISO 8601 timestamp
   cart: CartItem[];
@@ -30,7 +30,7 @@ export interface CheckoutSession {
   billing?: BillingInfo;
   totals: CheckoutTotals;
   available_shipping_options?: ShippingOption[];
-  payment_status?: 'pending' | 'authorized' | 'paid' | 'failed';
+  payment_status?: "pending" | "authorized" | "paid" | "failed";
 }
 
 export interface CartItem {
@@ -123,7 +123,7 @@ export interface UpdateCheckoutSessionResponse {
 // POST /checkout_sessions/{id}/complete - Complete Purchase
 export interface CompleteCheckoutSessionRequest {
   payment_method: {
-    type: 'card' | 'apple_pay' | 'google_pay';
+    type: "card" | "apple_pay" | "google_pay";
     // In a real implementation, you'd have payment provider tokens here
     // For this template, we'll mock the payment
     token?: string;
@@ -148,14 +148,20 @@ export interface CancelCheckoutSessionResponse {
 export interface Order {
   id: string;
   order_number: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status:
+    | "pending"
+    | "confirmed"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled";
   created_at: string; // ISO 8601 timestamp
   customer: CustomerInfo;
   items: OrderItem[];
   shipping: ShippingInfo;
   billing: BillingInfo;
   totals: CheckoutTotals;
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  payment_status: "pending" | "paid" | "failed" | "refunded";
 }
 
 export interface OrderItem {

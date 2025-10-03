@@ -1,11 +1,7 @@
 import { defineConfig, type UserConfig } from "tsdown";
 
 const config: UserConfig = defineConfig({
-	entry: [
-		"./src/index.ts",
-		"./src/next/index.ts",
-		"./src/test/index.ts",
-	],
+	entry: ["./src/index.ts", "./src/next/index.ts", "./src/test/index.ts"],
 	outDir: "./dist",
 	dts: true,
 	sourcemap: true,

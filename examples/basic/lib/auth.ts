@@ -1,7 +1,7 @@
 // Simple Authentication Middleware
 // TODO: Implement your own authentication logic
 
-import { NextRequest } from 'next/server';
+import type { NextRequest } from "next/server";
 
 // ============================================================================
 // Mock API Key Validation
@@ -9,16 +9,16 @@ import { NextRequest } from 'next/server';
 // ============================================================================
 
 export function validateApiKey(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization');
+  const authHeader = request.headers.get("authorization");
 
   if (!authHeader) {
     return false;
   }
 
   // Expected format: "Bearer YOUR_API_KEY"
-  const [type, apiKey] = authHeader.split(' ');
+  const [type, apiKey] = authHeader.split(" ");
 
-  if (type !== 'Bearer') {
+  if (type !== "Bearer") {
     return false;
   }
 
@@ -28,7 +28,7 @@ export function validateApiKey(request: NextRequest): boolean {
   // - Check key permissions/scopes
   // - Log access for audit trail
 
-  const validApiKey = process.env.ACP_API_KEY || 'test_api_key_12345';
+  const validApiKey = process.env.ACP_API_KEY || "test_api_key_12345";
 
   return apiKey === validApiKey;
 }
@@ -37,10 +37,11 @@ export function createAuthErrorResponse() {
   return Response.json(
     {
       error: {
-        code: 'unauthorized',
-        message: 'Invalid or missing API key. Include a valid API key in the Authorization header.',
+        code: "unauthorized",
+        message:
+          "Invalid or missing API key. Include a valid API key in the Authorization header.",
       },
     },
-    { status: 401 }
+    { status: 401 },
   );
 }

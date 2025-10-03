@@ -1,7 +1,7 @@
 // Mock Data Storage and Sample Products
 // TODO: Replace this with your actual database or API calls
 
-import { Product, CheckoutSession, Order } from './types';
+import type { CheckoutSession, Order, Product } from "./types";
 
 // ============================================================================
 // Sample Products
@@ -10,48 +10,48 @@ import { Product, CheckoutSession, Order } from './types';
 
 export const SAMPLE_PRODUCTS: Product[] = [
   {
-    id: 'prod_coffee_mug',
-    name: 'Premium Coffee Mug',
-    description: 'Hand-crafted ceramic mug, perfect for your morning coffee',
+    id: "prod_coffee_mug",
+    name: "Premium Coffee Mug",
+    description: "Hand-crafted ceramic mug, perfect for your morning coffee",
     price: 2499, // $24.99
-    currency: 'USD',
-    image_url: 'https://example.com/images/coffee-mug.jpg',
+    currency: "USD",
+    image_url: "https://example.com/images/coffee-mug.jpg",
     available: true,
   },
   {
-    id: 'prod_notebook',
-    name: 'Leather Notebook',
-    description: 'Premium leather-bound notebook with 200 pages',
+    id: "prod_notebook",
+    name: "Leather Notebook",
+    description: "Premium leather-bound notebook with 200 pages",
     price: 3999, // $39.99
-    currency: 'USD',
-    image_url: 'https://example.com/images/notebook.jpg',
+    currency: "USD",
+    image_url: "https://example.com/images/notebook.jpg",
     available: true,
   },
   {
-    id: 'prod_water_bottle',
-    name: 'Insulated Water Bottle',
-    description: 'Keeps drinks cold for 24 hours, hot for 12 hours',
+    id: "prod_water_bottle",
+    name: "Insulated Water Bottle",
+    description: "Keeps drinks cold for 24 hours, hot for 12 hours",
     price: 2999, // $29.99
-    currency: 'USD',
-    image_url: 'https://example.com/images/water-bottle.jpg',
+    currency: "USD",
+    image_url: "https://example.com/images/water-bottle.jpg",
     available: true,
   },
   {
-    id: 'prod_tote_bag',
-    name: 'Canvas Tote Bag',
-    description: 'Durable canvas tote bag for everyday use',
+    id: "prod_tote_bag",
+    name: "Canvas Tote Bag",
+    description: "Durable canvas tote bag for everyday use",
     price: 1999, // $19.99
-    currency: 'USD',
-    image_url: 'https://example.com/images/tote-bag.jpg',
+    currency: "USD",
+    image_url: "https://example.com/images/tote-bag.jpg",
     available: true,
   },
   {
-    id: 'prod_desk_lamp',
-    name: 'LED Desk Lamp',
-    description: 'Adjustable LED desk lamp with touch controls',
+    id: "prod_desk_lamp",
+    name: "LED Desk Lamp",
+    description: "Adjustable LED desk lamp with touch controls",
     price: 4999, // $49.99
-    currency: 'USD',
-    image_url: 'https://example.com/images/desk-lamp.jpg',
+    currency: "USD",
+    image_url: "https://example.com/images/desk-lamp.jpg",
     available: true,
   },
 ];
@@ -66,14 +66,17 @@ export const orders = new Map<string, Order>();
 
 // Idempotency key storage: Maps idempotency keys to session IDs
 // In production, use a database with TTL/expiration (e.g., Redis)
-export const idempotencyKeys = new Map<string, { sessionId: string; createdAt: Date }>();
+export const idempotencyKeys = new Map<
+  string,
+  { sessionId: string; createdAt: Date }
+>();
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
 export function getProductById(productId: string): Product | undefined {
-  return SAMPLE_PRODUCTS.find(p => p.id === productId);
+  return SAMPLE_PRODUCTS.find((p) => p.id === productId);
 }
 
 export function isProductAvailable(productId: string): boolean {

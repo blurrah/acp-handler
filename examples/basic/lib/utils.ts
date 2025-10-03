@@ -1,14 +1,23 @@
 // Utility Functions for ACP Implementation
 // TODO: Customize these calculations for your business logic
 
-import { CartItem, CheckoutTotals, ShippingOption, Address } from './types';
+import type {
+  Address,
+  CartItem,
+  CheckoutTotals,
+  ShippingOption,
+} from "./types";
 
 // ============================================================================
 // Tax Calculation
 // TODO: Integrate with your tax calculation service (TaxJar, Avalara, etc.)
 // ============================================================================
 
-export function calculateTax(subtotal: number, shippingCost: number, address?: Address): number {
+export function calculateTax(
+  subtotal: number,
+  shippingCost: number,
+  address?: Address,
+): number {
   // Simple mock implementation - 8% tax rate
   // In reality, tax rates vary by location and product type
 
@@ -33,7 +42,9 @@ export function calculateTax(subtotal: number, shippingCost: number, address?: A
 // TODO: Integrate with your shipping provider (Shippo, EasyPost, etc.)
 // ============================================================================
 
-export function getAvailableShippingOptions(address?: Address): ShippingOption[] {
+export function getAvailableShippingOptions(
+  address?: Address,
+): ShippingOption[] {
   // Mock shipping options
   // TODO: Replace with real-time shipping rates from your carrier
 
@@ -43,23 +54,23 @@ export function getAvailableShippingOptions(address?: Address): ShippingOption[]
 
   return [
     {
-      id: 'standard',
-      name: 'Standard Shipping',
-      description: 'Delivery in 5-7 business days',
+      id: "standard",
+      name: "Standard Shipping",
+      description: "Delivery in 5-7 business days",
       price: 599, // $5.99
       estimated_delivery_days: 6,
     },
     {
-      id: 'express',
-      name: 'Express Shipping',
-      description: 'Delivery in 2-3 business days',
+      id: "express",
+      name: "Express Shipping",
+      description: "Delivery in 2-3 business days",
       price: 1499, // $14.99
       estimated_delivery_days: 2,
     },
     {
-      id: 'overnight',
-      name: 'Overnight Shipping',
-      description: 'Next business day delivery',
+      id: "overnight",
+      name: "Overnight Shipping",
+      description: "Next business day delivery",
       price: 2999, // $29.99
       estimated_delivery_days: 1,
     },
@@ -77,14 +88,14 @@ export function getShippingCost(shippingMethod?: string): number {
   }
 
   const shippingOptions = getAvailableShippingOptions({
-    line1: '',
-    city: '',
-    state: '',
-    postal_code: '',
-    country: 'US'
+    line1: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    country: "US",
   });
 
-  const option = shippingOptions.find(o => o.id === shippingMethod);
+  const option = shippingOptions.find((o) => o.id === shippingMethod);
   return option?.price ?? 0;
 }
 
@@ -95,11 +106,11 @@ export function getShippingCost(shippingMethod?: string): number {
 export function calculateTotals(
   cart: CartItem[],
   shippingMethod?: string,
-  shippingAddress?: Address
+  shippingAddress?: Address,
 ): CheckoutTotals {
   // Calculate subtotal
   const subtotal = cart.reduce((sum, item) => {
-    return sum + (item.price * item.quantity);
+    return sum + item.price * item.quantity;
   }, 0);
 
   // Calculate shipping
@@ -116,7 +127,7 @@ export function calculateTotals(
     shipping,
     tax,
     total,
-    currency: 'USD',
+    currency: "USD",
   };
 }
 
@@ -136,7 +147,9 @@ export function generateOrderId(): string {
 export function generateOrderNumber(): string {
   // Human-readable order number
   const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const random = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0");
   return `ORD-${timestamp}${random}`;
 }
 
@@ -149,9 +162,12 @@ export function isValidEmail(email: string): boolean {
   return emailRegex.test(email);
 }
 
-export function isValidPostalCode(postalCode: string, country: string): boolean {
+export function isValidPostalCode(
+  postalCode: string,
+  country: string,
+): boolean {
   // Simple validation - TODO: Add more robust validation per country
-  if (country === 'US') {
+  if (country === "US") {
     return /^\d{5}(-\d{4})?$/.test(postalCode);
   }
   return postalCode.length > 0;

@@ -40,6 +40,7 @@ export async function POST(req: Request) {
 						})
 						.optional(),
 				}),
+				// @ts-expect-error - AI SDK v5 type inference issue
 				execute: async ({ items, customer, fulfillment }) => {
 					const response = await fetch(`${BASE_URL}/checkout_sessions`, {
 						method: "POST",
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
 						})
 						.optional(),
 				}),
+				// @ts-expect-error - AI SDK v5 type inference issue
 				execute: async ({ id, items, customer, fulfillment }) => {
 					const response = await fetch(`${BASE_URL}/checkout_sessions/${id}`, {
 						method: "POST",
@@ -112,6 +114,7 @@ export async function POST(req: Request) {
 						})
 						.optional(),
 				}),
+				// @ts-expect-error - AI SDK v5 type inference issue
 				execute: async ({ id, payment }) => {
 					const response = await fetch(
 						`${BASE_URL}/checkout_sessions/${id}/complete`,
@@ -134,6 +137,7 @@ export async function POST(req: Request) {
 				parameters: z.object({
 					id: z.string().describe("Checkout session ID"),
 				}),
+				// @ts-expect-error - AI SDK v5 type inference issue
 				execute: async ({ id }) => {
 					const response = await fetch(`${BASE_URL}/checkout_sessions/${id}`, {
 						method: "GET",
@@ -151,6 +155,7 @@ export async function POST(req: Request) {
 				parameters: z.object({
 					id: z.string().describe("Checkout session ID"),
 				}),
+				// @ts-expect-error - AI SDK v5 type inference issue
 				execute: async ({ id }) => {
 					const response = await fetch(
 						`${BASE_URL}/checkout_sessions/${id}/cancel`,
@@ -168,5 +173,5 @@ export async function POST(req: Request) {
 		},
 	});
 
-	return result.toDataStreamResponse();
+	return result.toTextStreamResponse();
 }

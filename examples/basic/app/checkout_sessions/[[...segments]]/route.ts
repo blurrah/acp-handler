@@ -3,7 +3,7 @@ import {
 	createNextCatchAll,
 	createOutboundWebhook,
 	createStoreWithRedis,
-} from "@acp/sdk";
+} from "acp-handler";
 import { after } from "next/server";
 
 // Not sure if needed
@@ -95,13 +95,13 @@ const webhooks = {
 	},
 };
 
-// Build protocol handlers from SDK
+// Build protocol handlers from acp-handler
 const handlers = createHandlers(
 	{ products, payments, webhooks },
 	{ store },
 );
 
-// Use SDK’s validated catch-all
+// Use acp-handler's validated catch-all
 const { GET, POST } = createNextCatchAll(handlers);
 
 export { GET, POST };

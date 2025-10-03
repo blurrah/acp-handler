@@ -6,7 +6,7 @@ import {
 	createMockProducts,
 	createMockWebhooks,
 	createRequest,
-} from "./helpers";
+} from "../src/test";
 
 describe("Checkout Integration", () => {
 	let handlers: ReturnType<typeof createHandlers>;

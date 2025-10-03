@@ -48,12 +48,12 @@ importers:
 
   examples/basic:
     dependencies:
-      '@acp/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
       '@ai-sdk/react':
         specifier: ^2.0.59
         version: 2.0.59(react@19.1.0)(zod@4.1.11)
+      acp-handler:
+        specifier: workspace:*
+        version: link:../../packages/sdk
       ai:
         specifier: ^5.0.59
         version: 5.0.59(zod@4.1.11)

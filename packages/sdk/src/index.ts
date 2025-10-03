@@ -1,3 +1,3 @@
-// Re-export checkout for convenience/backwards compatibility
-// Users can import from "@acp/sdk" or "@acp/sdk/checkout"
+// Re-export checkout for convenience
+// Users can import from "acp-handler" or "acp-handler/checkout"
 export * from "./checkout";

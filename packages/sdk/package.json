@@ -37,6 +37,18 @@
             "import": "./dist/checkout/index.js",
             "types": "./dist/checkout/index.d.ts"
         },
+        "./next": {
+            "import": "./dist/checkout/next/index.js",
+            "types": "./dist/checkout/next/index.d.ts"
+        },
+        "./hono": {
+            "import": "./dist/checkout/hono/index.js",
+            "types": "./dist/checkout/hono/index.d.ts"
+        },
+        "./test": {
+            "import": "./dist/test/index.js",
+            "types": "./dist/test/index.d.ts"
+        },
         "./feeds": {
             "import": "./dist/feeds/index.js",
             "types": "./dist/feeds/index.d.ts"

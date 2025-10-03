@@ -50,12 +50,7 @@ export function createStoreWithRedis(
 	client?: RedisClientType,
 ) {
 	const kv: KV = createRedisKV(client, namespace);
-	const sessions = sessionStore(kv);
 	return {
-		store: {
-			getSession: sessions.get,
-			putSession: sessions.put,
-			idem: kv, // idempotency via Redis
-		},
+		store: kv,
 	};
 }

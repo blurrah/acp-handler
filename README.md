@@ -40,7 +40,7 @@ pnpm add hono  # For Hono
 ### 1. Implement Required Handlers
 
 ```typescript
-import { createHandlers } from 'acp-handler/checkout';
+import { createHandlers } from 'acp-handler';
 
 const handlers = createHandlers(
   {
@@ -132,7 +132,7 @@ const handlers = createHandlers(
 
 ```typescript
 // app/checkout_sessions/[[...segments]]/route.ts
-import { createNextCatchAll } from 'acp-handler/checkout/next';
+import { createNextCatchAll } from 'acp-handler/next';
 
 const { GET, POST } = createNextCatchAll(handlers);
 
@@ -144,7 +144,7 @@ export { GET, POST };
 ```typescript
 // server.ts
 import { Hono } from 'hono';
-import { handler } from 'acp-handler/checkout/hono';
+import { handler } from 'acp-handler/hono';
 
 const app = new Hono();
 
@@ -230,7 +230,7 @@ type KV = {
 
 **Built-in Redis adapter:**
 ```typescript
-import { createStoreWithRedis } from 'acp-handler/checkout';
+import { createStoreWithRedis } from 'acp-handler';
 
 const { store } = createStoreWithRedis('namespace');
 ```
@@ -242,7 +242,7 @@ const { store } = createStoreWithRedis('namespace');
 Verify that requests are actually from OpenAI/ChatGPT and haven't been tampered with:
 
 ```typescript
-import { createHandlers } from 'acp-handler/checkout';
+import { createHandlers } from 'acp-handler';
 
 const handlers = createHandlers(
   { products, payments, webhooks },
@@ -372,7 +372,7 @@ Creates checkout handlers implementing the ACP spec.
 Creates Next.js catch-all route handlers.
 
 ```typescript
-import { createNextCatchAll } from 'acp-handler/checkout/next';
+import { createNextCatchAll } from 'acp-handler/next';
 
 const { GET, POST } = createNextCatchAll(handlers);
 export { GET, POST };
@@ -383,7 +383,7 @@ export { GET, POST };
 Creates a Redis-backed KV store.
 
 ```typescript
-import { createStoreWithRedis } from 'acp-handler/checkout';
+import { createStoreWithRedis } from 'acp-handler';
 
 // Uses REDIS_URL environment variable
 const { store } = createStoreWithRedis('acp');
@@ -394,7 +394,7 @@ const { store } = createStoreWithRedis('acp');
 Helper for signing outbound webhooks to ChatGPT.
 
 ```typescript
-import { createOutboundWebhook } from 'acp-handler/checkout';
+import { createOutboundWebhook } from 'acp-handler';
 
 const webhook = createOutboundWebhook({
   webhookUrl: process.env.OPENAI_WEBHOOK_URL,

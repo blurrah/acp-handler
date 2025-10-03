@@ -49,8 +49,7 @@ pnpm dev                     # Start Next.js example app
 The SDK has dedicated export paths to minimize bundle size:
 - `acp-handler` - Main entry (checkout handlers)
 - `acp-handler/checkout` - Checkout implementation
-- `acp-handler/next` - Next.js adapter
-- `acp-handler/hono` - Hono adapter
+- `acp-handler/next` - Next.js catch-all route adapter
 - `acp-handler/test` - Test utilities
 - `acp-handler/feeds` - Product feeds (planned)
 
@@ -118,10 +117,6 @@ Users must implement three handler interfaces:
 - Works with `[[...segments]]/route.ts` catch-all routes
 - Handles path parsing and body extraction
 
-**`src/checkout/hono/index.ts`** - Hono framework
-- `handler()` wrapper adapts core handlers to Hono's context
-- Provides path parameter extraction and response conversion
-
 #### Testing Infrastructure
 
 **`src/test/index.ts`** - Test utilities
@@ -168,8 +163,7 @@ HTTP status codes: 400 (client error), 401 (auth), 404 (not found), 500 (server 
 - **zod** ^4.1.11 - Schema validation
 
 ### Peer (Optional)
-- **next** >=15.5 - Next.js adapter
-- **hono** >=4.9 - Hono adapter
+- **next** >=15.5 - Next.js catch-all route helper
 - **redis** >=5.8 - Redis storage backend
 - **@opentelemetry/api** >=1.0.0 - Tracing support
 

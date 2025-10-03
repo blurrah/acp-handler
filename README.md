@@ -29,10 +29,9 @@ The handler requires a key-value store for session storage. Redis is recommended
 pnpm add redis
 ```
 
-Optional dependencies for framework adapters:
+Optional dependencies:
 ```bash
-pnpm add next  # For Next.js
-pnpm add hono  # For Hono
+pnpm add next  # For Next.js catch-all route helper
 ```
 
 ## Quick Start
@@ -141,18 +140,56 @@ export { GET, POST };
 
 #### Hono
 
+Hono natively supports Web Standard APIs, so no adapter needed:
+
 ```typescript
 // server.ts
 import { Hono } from 'hono';
-import { handler } from 'acp-handler/hono';
+import { handlers } from './checkout-handlers';
+import { parseJSON, validateBody } from 'acp-handler';
+import {
+  CreateCheckoutSessionSchema,
+  UpdateCheckoutSessionSchema,
+  CompleteCheckoutSessionSchema,
+} from 'acp-handler';
 
 const app = new Hono();
 
-app.post('/checkout_sessions', handler(handlers.create));
-app.get('/checkout_sessions/:id', handler(handlers.get));
-app.post('/checkout_sessions/:id', handler(handlers.update));
-app.post('/checkout_sessions/:id/complete', handler(handlers.complete));
-app.post('/checkout_sessions/:id/cancel', handler(handlers.cancel));
+app.post('/checkout_sessions', async (c) => {
+  const parsed = await parseJSON(c.req.raw);
+  if (!parsed.ok) return parsed.res;
+  const validated = validateBody(CreateCheckoutSessionSchema, parsed.body);
+  if (!validated.ok) return validated.res;
+  return handlers.create(c.req.raw, validated.data);
+});
+
+app.get('/checkout_sessions/:id', async (c) => {
+  const id = c.req.param('id');
+  return handlers.get(c.req.raw, id);
+});
+
+app.post('/checkout_sessions/:id', async (c) => {
+  const id = c.req.param('id');
+  const parsed = await parseJSON(c.req.raw);
+  if (!parsed.ok) return parsed.res;
+  const validated = validateBody(UpdateCheckoutSessionSchema, parsed.body);
+  if (!validated.ok) return validated.res;
+  return handlers.update(c.req.raw, id, validated.data);
+});
+
+app.post('/checkout_sessions/:id/complete', async (c) => {
+  const id = c.req.param('id');
+  const parsed = await parseJSON(c.req.raw);
+  if (!parsed.ok) return parsed.res;
+  const validated = validateBody(CompleteCheckoutSessionSchema, parsed.body);
+  if (!validated.ok) return validated.res;
+  return handlers.complete(c.req.raw, id, validated.data);
+});
+
+app.post('/checkout_sessions/:id/cancel', async (c) => {
+  const id = c.req.param('id');
+  return handlers.cancel(c.req.raw, id);
+});
 ```
 
 #### Express / Node.js

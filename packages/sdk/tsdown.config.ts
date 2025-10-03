@@ -5,7 +5,6 @@ const config: UserConfig = defineConfig({
 		"./src/index.ts",
 		"./src/checkout/index.ts",
 		"./src/checkout/next/index.ts",
-		"./src/checkout/hono/index.ts",
 		"./src/test/index.ts",
 		"./src/feeds/index.ts",
 	],

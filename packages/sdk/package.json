@@ -41,10 +41,6 @@
 			"import": "./dist/checkout/next/index.js",
 			"types": "./dist/checkout/next/index.d.ts"
 		},
-		"./hono": {
-			"import": "./dist/checkout/hono/index.js",
-			"types": "./dist/checkout/hono/index.d.ts"
-		},
 		"./test": {
 			"import": "./dist/test/index.js",
 			"types": "./dist/test/index.d.ts"
@@ -70,15 +66,11 @@
 	},
 	"peerDependencies": {
 		"@opentelemetry/api": ">=1.0.0",
-		"hono": ">=4.9",
 		"next": ">=15.5",
 		"redis": ">=5.8"
 	},
 	"peerDependenciesMeta": {
 		"@opentelemetry/api": {
-			"optional": true
-		},
-		"hono": {
 			"optional": true
 		},
 		"next": {
@@ -92,7 +84,6 @@
 		"@biomejs/biome": "2.2.0",
 		"@opentelemetry/api": "^1.9.0",
 		"@types/node": "^20",
-		"hono": "^4.9.9",
 		"next": "^15.6.0-canary.34",
 		"redis": "^5.8.2",
 		"rolldown-plugin-dts": "^0.16.11",

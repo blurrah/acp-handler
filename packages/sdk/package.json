@@ -1,6 +1,6 @@
 {
 	"name": "acp-handler",
-	"version": "0.0.0-alpha.6",
+	"version": "0.0.0-alpha.7",
 	"description": "TypeScript SDK for implementing the Agentic Commerce Protocol (ACP) - build checkout APIs that AI agents like ChatGPT can use to complete purchases",
 	"license": "MIT",
 	"author": "Boris Besemer <borisbesemer@gmail.com>",
@@ -13,6 +13,9 @@
 	"bugs": {
 		"url": "https://github.com/blurrah/agentic-commerce-protocol-template/issues"
 	},
+	"files": [
+		"dist/**/*"
+	],
 	"keywords": [
 		"acp",
 		"agentic-commerce",
@@ -29,24 +32,24 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
+		"./package.json": "./package.json",
 		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
 		},
 		"./checkout": {
-			"import": "./dist/checkout/index.js",
-			"types": "./dist/checkout/index.d.ts"
+			"types": "./dist/checkout/index.d.ts",
+			"import": "./dist/checkout/index.js"
 		},
 		"./next": {
-			"import": "./dist/checkout/next/index.js",
-			"types": "./dist/checkout/next/index.d.ts"
+			"types": "./dist/checkout/next/index.d.ts",
+			"import": "./dist/checkout/next/index.js"
 		},
 		"./test": {
-			"import": "./dist/test/index.js",
-			"types": "./dist/test/index.d.ts"
+			"types": "./dist/test/index.d.ts",
+			"import": "./dist/test/index.js"
 		},
 		"./feeds": {
-			"import": "./dist/feeds/index.js",
 			"types": "./dist/feeds/index.d.ts"
 		}
 	},
@@ -59,7 +62,7 @@
 		"format": "biome format --write",
 		"format:fix": "biome format --write",
 		"check-types": "tsc --noEmit",
-		"prepublishOnly": "cp ../../README.md README.md"
+		"prepublishOnly": "cp ../../README.md README.md || true"
 	},
 	"dependencies": {
 		"zod": "^4.1.11"

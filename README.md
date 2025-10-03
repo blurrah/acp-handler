@@ -11,7 +11,7 @@ An open standard for programmatic commerce flows between buyers, AI agents, and 
 - ✅ Type-safe TypeScript API
 - ✅ Built-in idempotency (prevents double-charging)
 - ✅ OpenTelemetry tracing support
-- ✅ Framework adapters (Next.js, Hono)
+- ✅ Web Standard APIs (works with Next.js, Hono, Express, Cloudflare Workers, Deno, Bun, Remix)
 - ✅ Production-ready patterns
 - ✅ Comprehensive test suite
 
@@ -154,6 +154,88 @@ app.post('/checkout_sessions/:id', handler(handlers.update));
 app.post('/checkout_sessions/:id/complete', handler(handlers.complete));
 app.post('/checkout_sessions/:id/cancel', handler(handlers.cancel));
 ```
+
+#### Express / Node.js
+
+The core handlers use Web Standard `Request`/`Response` objects. For Node.js frameworks like Express, use [`@whatwg-node/server`](https://github.com/ardatan/whatwg-node):
+
+```bash
+pnpm add @whatwg-node/server
+```
+
+```typescript
+// server.ts
+import express from 'express';
+import { createServerAdapter } from '@whatwg-node/server';
+import { handlers } from './checkout-handlers';
+import { parseJSON, validateBody } from 'acp-handler';
+import {
+  CreateCheckoutSessionSchema,
+  UpdateCheckoutSessionSchema,
+  CompleteCheckoutSessionSchema,
+} from 'acp-handler';
+
+const app = express();
+
+// Helper to extract route params
+const getId = (req: Request) => req.url.split('/').filter(Boolean)[1];
+
+// POST /checkout_sessions
+app.post('/checkout_sessions', createServerAdapter(async (req: Request) => {
+  const parsed = await parseJSON(req);
+  if (!parsed.ok) return parsed.res;
+  const validated = validateBody(CreateCheckoutSessionSchema, parsed.body);
+  if (!validated.ok) return validated.res;
+  return handlers.create(req, validated.data);
+}));
+
+// GET /checkout_sessions/:id
+app.get('/checkout_sessions/:id', createServerAdapter(async (req: Request) => {
+  const id = getId(req);
+  return handlers.get(req, id);
+}));
+
+// POST /checkout_sessions/:id
+app.post('/checkout_sessions/:id', createServerAdapter(async (req: Request) => {
+  const id = getId(req);
+  const parsed = await parseJSON(req);
+  if (!parsed.ok) return parsed.res;
+  const validated = validateBody(UpdateCheckoutSessionSchema, parsed.body);
+  if (!validated.ok) return validated.res;
+  return handlers.update(req, id, validated.data);
+}));
+
+// POST /checkout_sessions/:id/complete
+app.post('/checkout_sessions/:id/complete', createServerAdapter(async (req: Request) => {
+  const id = getId(req);
+  const parsed = await parseJSON(req);
+  if (!parsed.ok) return parsed.res;
+  const validated = validateBody(CompleteCheckoutSessionSchema, parsed.body);
+  if (!validated.ok) return validated.res;
+  return handlers.complete(req, id, validated.data);
+}));
+
+// POST /checkout_sessions/:id/cancel
+app.post('/checkout_sessions/:id/cancel', createServerAdapter(async (req: Request) => {
+  const id = getId(req);
+  return handlers.cancel(req, id);
+}));
+
+app.listen(3000);
+```
+
+**Note:** This approach works with Express, Fastify, Koa, and any Node.js HTTP framework.
+
+#### Other Frameworks
+
+The handlers use Web Standard APIs and work natively with:
+- Cloudflare Workers
+- Deno Deploy
+- Bun
+- Vercel Edge Functions
+- Remix
+
+Just call the handlers directly with `Request` objects!
 
 ### 3. Done!
 

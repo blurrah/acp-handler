@@ -1,10 +1,4 @@
-import {
-  createHandlers,
-  createNextCatchAll,
-  createOutboundWebhook,
-  createStoreWithRedis,
-} from "acp-handler";
-import { after } from "next/server";
+import { acpHandler, createNextCatchAll, createStoreWithRedis } from "acp-handler";
 
 // Not sure if needed
 export const dynamic = "force-dynamic";
@@ -59,46 +53,31 @@ const payments = {
   capture: async (_intentId: string) => ({ ok: true as const }),
 };
 
-// Optional webhook configuration
-const webhook =
-  process.env.OPENAI_WEBHOOK_URL && process.env.OPENAI_WEBHOOK_SECRET
-    ? createOutboundWebhook({
-        webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-        secret: process.env.OPENAI_WEBHOOK_SECRET,
-        merchantName: process.env.MERCHANT_NAME || "YourStore",
-      })
-    : null;
+// Create ACP handler with reusable utilities
+const acp = acpHandler({ products, payments, store });
 
-const webhooks = {
-  orderUpdated: async (evt: any) => {
-    if (!webhook) return; // Webhooks not configured
-
-    // Send webhook after response (non-blocking)
-    after(async () => {
-      try {
-        await webhook.orderUpdated({
-          checkout_session_id: evt.checkout_session_id,
-          status: evt.status,
-          order: evt.order,
-          permalink_url: evt.order
-            ? `${process.env.NEXT_PUBLIC_URL}/orders/${evt.order.id}`
-            : undefined,
-        });
-        console.log(
-          `✓ Webhook sent: order_updated for ${evt.checkout_session_id}`,
-        );
-      } catch (error) {
-        console.error("✗ Webhook failed:", error);
-        // TODO: Log to monitoring service for retry
-      }
-    });
-  },
-};
-
-// Build protocol handlers from acp-handler
-const handlers = createHandlers({ products, payments, webhooks }, { store });
-
-// Use acp-handler's validated catch-all
-const { GET, POST } = createNextCatchAll(handlers);
+// Export route handlers for Next.js
+const { GET, POST } = createNextCatchAll(acp.handlers);
 
 export { GET, POST };
+
+// Webhooks are now called separately from other parts of your app
+// For example, from a queue worker after checkout completes:
+//
+// import { acp } from './checkout_sessions/[[...segments]]/route'
+//
+// async function processWebhook(sessionId: string) {
+//   await acp.webhooks.sendOrderUpdated(sessionId, {
+//     webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+//     secret: process.env.OPENAI_WEBHOOK_SECRET!,
+//     merchantName: 'YourStore',
+//   });
+// }
+//
+// Or from your warehouse system when an order ships:
+//
+// await acp.webhooks.sendOrderUpdated(sessionId, {
+//   webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+//   secret: process.env.OPENAI_WEBHOOK_SECRET!,
+//   status: 'shipped',
+// });

@@ -16,7 +16,7 @@ import type {
 	UpdateCheckoutSessionRequest,
 } from "./types.ts";
 
-type Products = {
+export type Products = {
 	price(input: {
 		items: Array<{ id: string; quantity: number }>;
 		customer?: CheckoutSession["customer"];
@@ -30,7 +30,7 @@ type Products = {
 	}>;
 };
 
-type Payments = {
+export type Payments = {
 	// Delegated token (recommended path) or other payment handles
 	authorize(input: {
 		session: CheckoutSession;
@@ -41,7 +41,7 @@ type Payments = {
 	): Promise<{ ok: true } | { ok: false; reason: string }>;
 };
 
-type Webhooks = {
+export type Webhooks = {
 	// Merchant → Agent platform webhook emitter (signed)
 	orderUpdated(evt: {
 		checkout_session_id: string;
@@ -54,7 +54,6 @@ export function createHandlers(
 	handlers: {
 		products: Products;
 		payments: Payments;
-		webhooks: Webhooks;
 		sessions?: SessionStore;
 	},
 	options: {
@@ -63,7 +62,7 @@ export function createHandlers(
 		signature?: SignatureConfig;
 	},
 ) {
-	const { products, payments, webhooks } = handlers;
+	const { products, payments } = handlers;
 	// Use provided session store or default to Redis-backed store
 	const sessions = handlers.sessions ?? createRedisSessionStore(options.store);
 	const idempotency = options.store;
@@ -361,18 +360,6 @@ export function createHandlers(
 						status: "placed",
 					};
 
-					await traced(
-						tracer,
-						"webhooks.orderUpdated",
-						() =>
-							webhooks.orderUpdated({
-								checkout_session_id: s.id,
-								status: "completed",
-								order,
-							}),
-						{ session_id: s.id, order_id: order.id },
-					);
-
 					return { ...completed, order };
 				};
 
@@ -448,17 +435,6 @@ export function createHandlers(
 						session_id: next.id,
 					});
 
-					await traced(
-						tracer,
-						"webhooks.orderUpdated",
-						() =>
-							webhooks.orderUpdated({
-								checkout_session_id: s.id,
-								status: "canceled",
-							}),
-						{ session_id: s.id },
-					);
-
 					return next;
 				};
 
@@ -516,5 +492,122 @@ export function createHandlers(
 
 				return ok(s, { status: 200, echo: { [HEADERS.REQ_ID]: H.requestId } });
 			}),
+	};
+}
+
+/**
+ * Creates ACP handler with reusable utilities
+ *
+ * @example
+ * ```typescript
+ * import { acpHandler } from 'acp-handler';
+ *
+ * export const acp = acpHandler({
+ *   products,
+ *   payments,
+ *   store
+ * });
+ *
+ * // Use in route handler
+ * export const { GET, POST } = acp.handlers;
+ *
+ * // Use webhooks from queue worker
+ * await acp.webhooks.sendOrderUpdated(sessionId);
+ *
+ * // Use sessions from admin dashboard
+ * const session = await acp.sessions.get(sessionId);
+ * ```
+ */
+export function acpHandler(config: {
+	products: Products;
+	payments: Payments;
+	store: KV;
+	sessions?: SessionStore;
+	tracer?: Tracer;
+	signature?: SignatureConfig;
+}) {
+	const {
+		products,
+		payments,
+		store,
+		sessions: customSessions,
+		tracer,
+		signature,
+	} = config;
+
+	// Use provided session store or default to Redis-backed store
+	const sessions = customSessions ?? createRedisSessionStore(store);
+
+	// Create checkout handlers
+	const handlers = createHandlers(
+		{ products, payments, sessions },
+		{ store, tracer, signature },
+	);
+
+	return {
+		/**
+		 * Route handlers for checkout API endpoints
+		 * Use with Next.js catch-all routes or other frameworks
+		 */
+		handlers,
+
+		/**
+		 * Webhook utilities for sending notifications
+		 * Can be called from queue workers, warehouse systems, admin panels, etc.
+		 */
+		webhooks: {
+			/**
+			 * Send order updated webhook
+			 * @param sessionId - Checkout session ID
+			 * @param status - Optional status override (defaults to session status)
+			 */
+			async sendOrderUpdated(
+				sessionId: string,
+				webhookConfig: {
+					webhookUrl: string;
+					secret: string;
+					merchantName?: string;
+					status?: string;
+					order?: Order;
+				},
+			): Promise<void> {
+				const session = await sessions.get(sessionId);
+				if (!session) {
+					throw new Error(`Session "${sessionId}" not found`);
+				}
+
+				const { createOutboundWebhook } = await import(
+					"./webhooks/outbound.ts"
+				);
+				const webhook = createOutboundWebhook({
+					webhookUrl: webhookConfig.webhookUrl,
+					secret: webhookConfig.secret,
+					merchantName: webhookConfig.merchantName,
+				});
+
+				await webhook.orderUpdated({
+					checkout_session_id: sessionId,
+					status: webhookConfig.status ?? session.status,
+					order: webhookConfig.order,
+				});
+			},
+		},
+
+		/**
+		 * Session utilities for querying and updating sessions
+		 * Can be used from admin dashboards, analytics, etc.
+		 */
+		sessions: {
+			/**
+			 * Get a checkout session by ID
+			 */
+			get: (id: string) => sessions.get(id),
+
+			/**
+			 * Update a checkout session
+			 */
+			put: (session: CheckoutSession, ttlSec?: number) =>
+				sessions.put(session, ttlSec),
+		},
 	};
 }

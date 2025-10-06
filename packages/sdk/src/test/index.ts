@@ -118,7 +118,7 @@ export function createMockPayments(config?: {
 			};
 		},
 
-		capture: async (intentId: string) => {
+		capture: async (_intentId: string) => {
 			calls.capture++;
 			if (!captureSucceed) {
 				return {

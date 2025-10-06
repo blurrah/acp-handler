@@ -18,7 +18,7 @@ Real-world integration patterns for common e-commerce platforms and services.
 
 ```typescript
 import Stripe from 'stripe';
-import { createHandlers, createStoreWithRedis } from 'acp-handler';
+import { acpHandler, createStoreWithRedis } from 'acp-handler';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2024-12-18',
@@ -26,96 +26,92 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 const { store } = createStoreWithRedis('acp');
 
-const handlers = createHandlers(
-  {
-    products: {
-      price: async ({ items }) => {
-        // Your pricing logic
-        const lineItems = items.map(item => ({
-          id: item.id,
-          title: `Product ${item.id}`,
-          quantity: item.quantity,
-          unit_price: { amount: 2999, currency: 'USD' },
-        }));
+export const acp = acpHandler({
+  products: {
+    price: async ({ items }) => {
+      // Your pricing logic
+      const lineItems = items.map(item => ({
+        id: item.id,
+        title: `Product ${item.id}`,
+        quantity: item.quantity,
+        unit_price: { amount: 2999, currency: 'USD' },
+      }));
 
-        const subtotal = lineItems.reduce(
-          (sum, item) => sum + item.unit_price.amount * item.quantity,
-          0
-        );
+      const subtotal = lineItems.reduce(
+        (sum, item) => sum + item.unit_price.amount * item.quantity,
+        0
+      );
 
-        return {
-          items: lineItems,
-          totals: {
-            subtotal: { amount: subtotal, currency: 'USD' },
-            grand_total: { amount: subtotal, currency: 'USD' },
-          },
-          ready: true,
-        };
-      },
-    },
-
-    payments: {
-      authorize: async ({ session, delegated_token }) => {
-        try {
-          const intent = await stripe.paymentIntents.create({
-            amount: session.totals.grand_total.amount,
-            currency: session.totals.grand_total.currency.toLowerCase(),
-            payment_method: delegated_token,
-            capture_method: 'manual',
-            confirm: true,
-            metadata: {
-              session_id: session.id,
-              customer_email: session.customer?.billing_address?.email,
-            },
-          });
-
-          if (intent.status === 'requires_capture') {
-            return { ok: true, intent_id: intent.id };
-          }
-
-          return {
-            ok: false,
-            reason: `Authorization failed: ${intent.status}`,
-          };
-        } catch (error) {
-          console.error('Stripe authorization error:', error);
-          return {
-            ok: false,
-            reason: error.message || 'Payment authorization failed',
-          };
-        }
-      },
-
-      capture: async (intent_id) => {
-        try {
-          const intent = await stripe.paymentIntents.capture(intent_id);
-
-          if (intent.status === 'succeeded') {
-            return { ok: true };
-          }
-
-          return {
-            ok: false,
-            reason: `Capture failed: ${intent.status}`,
-          };
-        } catch (error) {
-          console.error('Stripe capture error:', error);
-          return {
-            ok: false,
-            reason: error.message || 'Payment capture failed',
-          };
-        }
-      },
-    },
-
-    webhooks: {
-      orderUpdated: async ({ checkout_session_id, status }) => {
-        console.log(`Order ${checkout_session_id} ${status}`);
-      },
+      return {
+        items: lineItems,
+        totals: {
+          subtotal: { amount: subtotal, currency: 'USD' },
+          grand_total: { amount: subtotal, currency: 'USD' },
+        },
+        ready: true,
+      };
     },
   },
-  { store }
-);
+
+  payments: {
+    authorize: async ({ session, delegated_token }) => {
+      try {
+        const intent = await stripe.paymentIntents.create({
+          amount: session.totals.grand_total.amount,
+          currency: session.totals.grand_total.currency.toLowerCase(),
+          payment_method: delegated_token,
+          capture_method: 'manual',
+          confirm: true,
+          metadata: {
+            session_id: session.id,
+            customer_email: session.customer?.billing_address?.email,
+          },
+        });
+
+        if (intent.status === 'requires_capture') {
+          return { ok: true, intent_id: intent.id };
+        }
+
+        return {
+          ok: false,
+          reason: `Authorization failed: ${intent.status}`,
+        };
+      } catch (error) {
+        console.error('Stripe authorization error:', error);
+        return {
+          ok: false,
+          reason: error.message || 'Payment authorization failed',
+        };
+      }
+    },
+
+    capture: async (intent_id) => {
+      try {
+        const intent = await stripe.paymentIntents.capture(intent_id);
+
+        if (intent.status === 'succeeded') {
+          return { ok: true };
+        }
+
+        return {
+          ok: false,
+          reason: `Capture failed: ${intent.status}`,
+        };
+      } catch (error) {
+        console.error('Stripe capture error:', error);
+        return {
+          ok: false,
+          reason: error.message || 'Payment capture failed',
+        };
+      }
+    },
+  },
+
+  store,
+});
+
+// Use in your route handler
+export const handlers = acp.handlers;
 ```
 
 ### Stripe with Customer Creation
@@ -229,7 +225,7 @@ Integrate ACP with Shopify as your product catalog and order management system.
 
 ```typescript
 import Shopify from 'shopify-api-node';
-import { createHandlers, createStoreWithRedis } from 'acp-handler';
+import { acpHandler, createStoreWithRedis } from 'acp-handler';
 import type { CheckoutSession, SessionStore } from 'acp-handler';
 
 const shopify = new Shopify({
@@ -293,34 +289,33 @@ const sessions: SessionStore = {
   },
 };
 
-const handlers = createHandlers(
-  {
-    products: {
-      price: async ({ items, customer }) => {
-        // Create or update Shopify checkout
-        const checkout = await shopify.checkout.create({
-          line_items: items.map(item => ({
-            variant_id: item.id,
-            quantity: item.quantity,
-          })),
-          email: customer?.billing_address?.email,
-        });
-
-        // Shopify calculates everything for us
-        const lineItems = checkout.line_items.map(item => ({
-          id: String(item.variant_id),
-          title: item.title,
+export const acp = acpHandler({
+  products: {
+    price: async ({ items, customer }) => {
+      // Create or update Shopify checkout
+      const checkout = await shopify.checkout.create({
+        line_items: items.map(item => ({
+          variant_id: item.id,
           quantity: item.quantity,
-          unit_price: {
-            amount: parseFloat(item.price) * 100,
-            currency: checkout.currency,
-          },
-          image_url: item.image_url,
-          sku: item.sku,
-        }));
+        })),
+        email: customer?.billing_address?.email,
+      });
 
-        return {
-          items: lineItems,
+      // Shopify calculates everything for us
+      const lineItems = checkout.line_items.map(item => ({
+        id: String(item.variant_id),
+        title: item.title,
+        quantity: item.quantity,
+        unit_price: {
+          amount: parseFloat(item.price) * 100,
+          currency: checkout.currency,
+        },
+        image_url: item.image_url,
+        sku: item.sku,
+      }));
+
+      return {
+        items: lineItems,
           totals: {
             subtotal: {
               amount: parseFloat(checkout.subtotal_price) * 100,
@@ -362,17 +357,9 @@ const handlers = createHandlers(
       },
     },
 
-    webhooks: {
-      orderUpdated: async ({ checkout_session_id, status, order }) => {
-        // Notify OpenAI
-        console.log(`Shopify order ${order?.id} ${status}`);
-      },
-    },
-
-    sessions, // Use Shopify as session storage
-  },
-  { store } // Still need Redis for idempotency
-);
+  sessions, // Use Shopify as session storage
+  store, // Still need Redis for idempotency
+});
 ```
 
 ## PostgreSQL Storage
@@ -424,16 +411,13 @@ const sessions: SessionStore = {
   },
 };
 
-// Use with handlers
-const handlers = createHandlers(
-  {
-    products,
-    payments,
-    webhooks,
-    sessions, // Custom PostgreSQL storage
-  },
-  { store } // Still need KV store for idempotency (can also be PostgreSQL)
-);
+// Use with ACP handler
+export const acp = acpHandler({
+  products,
+  payments,
+  sessions, // Custom PostgreSQL storage
+  store, // Still need KV store for idempotency (can also be PostgreSQL)
+});
 ```
 
 ## Tax Calculation (TaxJar)
@@ -642,19 +626,13 @@ const products = {
 
 ## Webhook Queues (Inngest)
 
-Use Inngest for reliable webhook delivery with automatic retries.
+Use Inngest for reliable webhook delivery with automatic retries. Since webhooks are optional and sent separately from checkout, you call `acp.webhooks.sendOrderUpdated()` from your queue consumer.
 
 ```typescript
 import { Inngest } from 'inngest';
-import { createOutboundWebhook } from 'acp-handler';
+import { acp } from '@/lib/acp'; // Your ACP handler
 
 const inngest = new Inngest({ id: 'acp-webhooks' });
-
-const webhook = createOutboundWebhook({
-  webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-  secret: process.env.OPENAI_WEBHOOK_SECRET,
-  merchantName: process.env.MERCHANT_NAME,
-});
 
 // Define Inngest function for webhook delivery
 export const sendWebhook = inngest.createFunction(
@@ -662,33 +640,31 @@ export const sendWebhook = inngest.createFunction(
   { event: 'acp/order.updated' },
   async ({ event, step }) => {
     await step.run('send-webhook', async () => {
-      await webhook.orderUpdated({
-        checkout_session_id: event.data.checkout_session_id,
+      await acp.webhooks.sendOrderUpdated(event.data.checkout_session_id, {
+        webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+        secret: process.env.OPENAI_WEBHOOK_SECRET!,
+        merchantName: process.env.MERCHANT_NAME!,
         status: event.data.status,
         order: event.data.order,
-        permalink_url: event.data.permalink_url,
       });
     });
   }
 );
 
-// Use in webhooks handler
-const webhooks = {
-  orderUpdated: async ({ checkout_session_id, status, order }) => {
-    // Enqueue webhook for reliable delivery
-    await inngest.send({
-      name: 'acp/order.updated',
-      data: {
-        checkout_session_id,
-        status,
-        order,
-        permalink_url: order
-          ? `${process.env.NEXT_PUBLIC_URL}/orders/${order.id}`
-          : undefined,
+// Enqueue webhook from your warehouse system when order ships
+async function handleOrderShipped(sessionId: string, trackingNumber: string) {
+  await inngest.send({
+    name: 'acp/order.updated',
+    data: {
+      checkout_session_id: sessionId,
+      status: 'shipped',
+      order: {
+        id: sessionId,
+        tracking_number: trackingNumber,
       },
-    });
-  },
-};
+    },
+  });
+}
 ```
 
 ## Complete Production Example
@@ -696,14 +672,11 @@ const webhooks = {
 A complete production-ready implementation with all integrations.
 
 ```typescript
-// app/checkout_sessions/[[...segments]]/route.ts
+// lib/acp.ts - Define once, use everywhere
 import {
-  createHandlers,
-  createNextCatchAll,
+  acpHandler,
   createStoreWithRedis,
-  createOutboundWebhook,
 } from 'acp-handler';
-import { after } from 'next/server';
 import Stripe from 'stripe';
 import Taxjar from 'taxjar';
 import { db } from '@/lib/db';
@@ -712,16 +685,10 @@ import { db } from '@/lib/db';
 const { store } = createStoreWithRedis('acp');
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const taxjar = new Taxjar({ apiKey: process.env.TAXJAR_API_KEY });
-const webhook = createOutboundWebhook({
-  webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-  secret: process.env.OPENAI_WEBHOOK_SECRET,
-  merchantName: process.env.MERCHANT_NAME,
-});
 
-const handlers = createHandlers(
-  {
-    products: {
-      price: async ({ items, customer, fulfillment }) => {
+export const acp = acpHandler({
+  products: {
+    price: async ({ items, customer, fulfillment }) => {
         // 1. Fetch products with inventory
         const products = await db.products.findMany({
           where: { id: { in: items.map(i => i.id) } },
@@ -891,40 +858,57 @@ const handlers = createHandlers(
       },
     },
 
-    webhooks: {
-      orderUpdated: async ({ checkout_session_id, status, order }) => {
-        // Non-blocking webhook delivery
-        after(async () => {
-          try {
-            await webhook.orderUpdated({
-              checkout_session_id,
-              status,
-              order,
-              permalink_url: order
-                ? `${process.env.NEXT_PUBLIC_URL}/orders/${order.id}`
-                : undefined,
-            });
-            console.log(`✓ Webhook sent: ${checkout_session_id}`);
-          } catch (error) {
-            console.error('✗ Webhook failed:', error);
+  store,
+});
+```
 
-            // Log to monitoring
-            await db.webhookFailures.create({
-              data: {
-                session_id: checkout_session_id,
-                error: error.message,
-              },
-            });
-          }
-        });
-      },
-    },
-  },
-  { store }
-);
+Now use it in your route:
 
-const { GET, POST } = createNextCatchAll(handlers);
-export { GET, POST };
+```typescript
+// app/checkout_sessions/[[...segments]]/route.ts
+import { createNextCatchAll } from 'acp-handler/next';
+import { acp } from '@/lib/acp';
+
+export const { GET, POST } = createNextCatchAll(acp.handlers);
+```
+
+And send webhooks from your warehouse system:
+
+```typescript
+// warehouse/ship-order.ts
+import { acp } from '@/lib/acp';
+import { after } from 'next/server';
+
+async function markOrderShipped(sessionId: string, trackingNumber: string) {
+  // Update database
+  await db.orders.update({
+    where: { id: sessionId },
+    data: { status: 'shipped', tracking_number: trackingNumber },
+  });
+
+  // Send webhook notification (optional, non-blocking)
+  after(async () => {
+    try {
+      await acp.webhooks.sendOrderUpdated(sessionId, {
+        webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+        secret: process.env.OPENAI_WEBHOOK_SECRET!,
+        merchantName: process.env.MERCHANT_NAME!,
+        status: 'shipped',
+      });
+      console.log(`✓ Webhook sent: ${sessionId}`);
+    } catch (error) {
+      console.error('✗ Webhook failed:', error);
+
+      // Log to monitoring
+      await db.webhookFailures.create({
+        data: {
+          session_id: sessionId,
+          error: error.message,
+        },
+      });
+    }
+  });
+}
 ```
 
 ## Next Steps

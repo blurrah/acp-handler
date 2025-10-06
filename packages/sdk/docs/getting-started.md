@@ -51,82 +51,81 @@ NEXT_PUBLIC_URL=https://yourstore.com
 
 ## Quick Start (Next.js)
 
-### Step 1: Create Your Handlers
+### Step 1: Create Your ACP Handler
 
-Create a file `app/checkout_sessions/[[...segments]]/route.ts`:
+Create a file `lib/acp.ts` to define your handler in one place:
 
 ```typescript
-import {
-  createHandlers,
-  createNextCatchAll,
-  createStoreWithRedis,
-} from 'acp-handler';
+import { acpHandler, createStoreWithRedis } from 'acp-handler';
 
 // 1. Set up Redis storage
 const { store } = createStoreWithRedis('acp');
 
-// 2. Implement Products Handler
-const products = {
-  price: async ({ items, customer, fulfillment }) => {
-    // TODO: Replace with your actual product database
-    const lineItems = items.map((item) => ({
-      id: item.id,
-      title: `Product ${item.id}`,
-      quantity: item.quantity,
-      unit_price: { amount: 2999, currency: 'USD' }, // $29.99
-    }));
+// 2. Create ACP handler with business logic
+export const acp = acpHandler({
+  // Products Handler
+  products: {
+    price: async ({ items, customer, fulfillment }) => {
+      // TODO: Replace with your actual product database
+      const lineItems = items.map((item) => ({
+        id: item.id,
+        title: `Product ${item.id}`,
+        quantity: item.quantity,
+        unit_price: { amount: 2999, currency: 'USD' }, // $29.99
+      }));
 
-    const subtotal = lineItems.reduce(
-      (sum, item) => sum + item.unit_price.amount * item.quantity,
-      0
-    );
+      const subtotal = lineItems.reduce(
+        (sum, item) => sum + item.unit_price.amount * item.quantity,
+        0
+      );
 
-    // Ready for payment when we have customer email
-    const ready = Boolean(customer?.billing_address?.email);
+      // Ready for payment when we have customer email
+      const ready = Boolean(customer?.billing_address?.email);
 
-    return {
-      items: lineItems,
-      totals: {
-        subtotal: { amount: subtotal, currency: 'USD' },
-        grand_total: { amount: subtotal, currency: 'USD' },
-      },
-      ready,
-    };
+      return {
+        items: lineItems,
+        totals: {
+          subtotal: { amount: subtotal, currency: 'USD' },
+          grand_total: { amount: subtotal, currency: 'USD' },
+        },
+        ready,
+      };
+    },
   },
-};
 
-// 3. Implement Payments Handler
-const payments = {
-  authorize: async ({ session, delegated_token }) => {
-    // TODO: Replace with your actual payment provider (Stripe, etc.)
-    console.log('Authorizing payment for session:', session.id);
-    const intentId = `pi_${crypto.randomUUID()}`;
-    return { ok: true, intent_id: intentId };
+  // Payments Handler
+  payments: {
+    authorize: async ({ session, delegated_token }) => {
+      // TODO: Replace with your actual payment provider (Stripe, etc.)
+      console.log('Authorizing payment for session:', session.id);
+      const intentId = `pi_${crypto.randomUUID()}`;
+      return { ok: true, intent_id: intentId };
+    },
+    capture: async (intent_id) => {
+      // TODO: Replace with your actual payment capture logic
+      console.log('Capturing payment:', intent_id);
+      return { ok: true };
+    },
   },
-  capture: async (intent_id) => {
-    // TODO: Replace with your actual payment capture logic
-    console.log('Capturing payment:', intent_id);
-    return { ok: true };
-  },
-};
 
-// 4. Implement Webhooks Handler
-const webhooks = {
-  orderUpdated: async ({ checkout_session_id, status, order }) => {
-    // TODO: Replace with actual webhook delivery
-    console.log('Order updated:', { checkout_session_id, status });
-  },
-};
-
-// 5. Create ACP handlers
-const handlers = createHandlers({ products, payments, webhooks }, { store });
-
-// 6. Export Next.js route handlers
-const { GET, POST } = createNextCatchAll(handlers);
-export { GET, POST };
+  // Storage backend
+  store,
+});
 ```
 
-### Step 2: Test Your Endpoints
+### Step 2: Mount Route Handlers
+
+Create `app/checkout_sessions/[[...segments]]/route.ts`:
+
+```typescript
+import { createNextCatchAll } from 'acp-handler/next';
+import { acp } from '@/lib/acp';
+
+// Export Next.js route handlers
+export const { GET, POST } = createNextCatchAll(acp.handlers);
+```
+
+### Step 3: Test Your Endpoints
 
 Start your Next.js dev server:
 
@@ -141,7 +140,7 @@ Your ACP endpoints are now available at:
 - `POST /checkout_sessions/:id/complete` - Complete checkout
 - `POST /checkout_sessions/:id/cancel` - Cancel session
 
-### Step 3: Test with curl
+### Step 4: Test with curl
 
 Create a session:
 
@@ -186,7 +185,7 @@ Expected response:
 ```typescript
 import { Hono } from 'hono';
 import {
-  createHandlers,
+  acpHandler,
   createStoreWithRedis,
   parseJSON,
   validateBody,
@@ -198,8 +197,9 @@ import {
 const app = new Hono();
 const { store } = createStoreWithRedis('acp');
 
-// Create handlers (products, payments, webhooks same as Next.js example)
-const handlers = createHandlers({ products, payments, webhooks }, { store });
+// Create ACP handler (products, payments same as Next.js example)
+const acp = acpHandler({ products, payments, store });
+const handlers = acp.handlers;
 
 // Wire up routes
 app.post('/checkout_sessions', async (c) => {
@@ -247,7 +247,7 @@ export default app;
 import express from 'express';
 import { createServerAdapter } from '@whatwg-node/server';
 import {
-  createHandlers,
+  acpHandler,
   createStoreWithRedis,
   parseJSON,
   validateBody,
@@ -259,8 +259,9 @@ import {
 const app = express();
 const { store } = createStoreWithRedis('acp');
 
-// Create handlers (products, payments, webhooks same as Next.js example)
-const handlers = createHandlers({ products, payments, webhooks }, { store });
+// Create ACP handler (products, payments same as Next.js example)
+const acp = acpHandler({ products, payments, store });
+const handlers = acp.handlers;
 
 // Helper to extract ID from URL
 const getId = (req: Request) => req.url.split('/').filter(Boolean)[1];
@@ -317,11 +318,22 @@ Now that you have a working implementation, here's what happens during a checkou
    - Your `products.price()` is called again with new context
    - When ready returns `true`, status changes to `ready_for_payment`
 
-3. **Complete** - AI agent submits payment
+3. **Complete** - AI agent submits payment with delegated token
    - Your `payments.authorize()` reserves funds
    - Your `payments.capture()` charges the customer
-   - Your `webhooks.orderUpdated()` notifies the AI platform
+   - OpenAI knows payment succeeded (you returned 200)
    - Session status: `completed`
+
+**Note:** With delegated tokens, webhooks are optional since OpenAI already knows payment succeeded. You'd send webhooks later for post-checkout events like shipping or delivery:
+
+```typescript
+// From your warehouse system when order ships
+await acp.webhooks.sendOrderUpdated(sessionId, {
+  webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+  secret: process.env.OPENAI_WEBHOOK_SECRET!,
+  status: 'shipped',
+});
+```
 
 See [ACP Flow](./acp-flow.md) for a detailed explanation with diagrams.
 
@@ -335,7 +347,8 @@ Now that you have a working implementation:
 2. **Integrate real payments** (Stripe, PayPal, etc.)
    - See [Integration Examples](./integration-examples.md) for Stripe integration
 
-3. **Set up webhooks** for production
+3. **Set up webhooks** for post-checkout events (optional)
+   - Webhooks are for shipping, delivery, cancellation after payment
    - See [Webhooks](../src/checkout/webhooks/README.md) for delivery patterns
 
 4. **Configure signature verification** for security
@@ -374,7 +387,6 @@ The SDK includes full TypeScript support. Import types as needed:
 import type {
   Products,
   Payments,
-  Webhooks,
   CheckoutSession,
   LineItem,
 } from 'acp-handler';
@@ -385,20 +397,21 @@ import type {
 Use the included test helpers for integration tests:
 
 ```typescript
-import { createMemoryStore, createMockProducts } from 'acp-handler/test';
-import { createHandlers } from 'acp-handler';
+import {
+  acpHandler,
+  createMemoryStore,
+  createMockProducts,
+  createMockPayments,
+} from 'acp-handler/test';
 
-const handlers = createHandlers(
-  {
-    products: createMockProducts(),
-    payments: createMockPayments(),
-    webhooks: createMockWebhooks(),
-  },
-  { store: createMemoryStore() }
-);
+const acp = acpHandler({
+  products: createMockProducts(),
+  payments: createMockPayments(),
+  store: createMemoryStore(),
+});
 
 // Test your flow
-const createRes = await handlers.create(request, {
+const createRes = await acp.handlers.create(request, {
   items: [{ id: 'prod_123', quantity: 1 }]
 });
 const session = await createRes.json();

@@ -1,20 +1,26 @@
 # Adapters
 
-Adapters are the interfaces between `acp-handler` and your business logic. You provide implementations for three required handlers (Products, Payments, Webhooks), and `acp-handler` orchestrates the checkout flow.
+Adapters are the interfaces between `acp-handler` and your business logic. You provide implementations for two required handlers (Products, Payments), and `acp-handler` orchestrates the checkout flow.
 
 ## Overview
 
 ```typescript
-import { createHandlers } from 'acp-handler';
+import { acpHandler } from 'acp-handler';
 
-const handlers = createHandlers(
-  {
-    products: { /* your pricing logic */ },
-    payments: { /* your payment provider */ },
-    webhooks: { /* your notification system */ },
-  },
-  { store } // Redis or custom storage
-);
+const acp = acpHandler({
+  products: { /* your pricing logic */ },
+  payments: { /* your payment provider */ },
+  store // Redis or custom storage
+});
+
+// Use the handlers in your routes
+const handlers = acp.handlers;
+
+// Send webhooks from anywhere (optional)
+await acp.webhooks.sendOrderUpdated(sessionId, config);
+
+// Access sessions from anywhere
+const session = await acp.sessions.get(sessionId);
 ```
 
 ## Products Handler
@@ -500,160 +506,126 @@ const payments = {
 };
 ```
 
-## Webhooks Handler
+## Webhooks (Optional)
 
-The Webhooks handler notifies AI platforms about order status changes. It's called **after successful complete or cancel** operations.
+**Important:** With delegated tokens, OpenAI already knows when payment succeeds (you return 200 from the complete endpoint). Webhooks are **only needed for post-checkout lifecycle events** like shipping, delivery, or cancellation after payment.
 
-### Type Definition
+Webhooks are sent using `acp.webhooks.sendOrderUpdated()` from anywhere in your app - warehouse systems, fulfillment tracking, admin panels, etc.
+
+### Usage
 
 ```typescript
-type Webhooks = {
-  orderUpdated(evt: {
-    checkout_session_id: string;
-    status: string;
-    order?: Order;
-  }): Promise<void>;
-};
+import { acp } from '@/lib/acp'; // Your ACP handler
+
+// From your warehouse system when order ships
+await acp.webhooks.sendOrderUpdated(sessionId, {
+  webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+  secret: process.env.OPENAI_WEBHOOK_SECRET!,
+  merchantName: 'YourStore',
+  status: 'shipped',
+  order: {
+    id: orderId,
+    checkout_session_id: sessionId,
+    status: 'shipped',
+  },
+});
 ```
 
-### Next.js Implementation with `after()`
+### Common Patterns
+
+**Queue-based delivery** (recommended for production):
+
+```typescript
+// warehouse/ship-order.ts
+async function handleOrderShipped(orderId: string, trackingNumber: string) {
+  const session = await acp.sessions.get(orderId);
+  if (!session) return;
+
+  // Enqueue webhook for reliable delivery
+  await queue.enqueue('send-webhook', {
+    sessionId: session.id,
+    status: 'shipped',
+    tracking: trackingNumber,
+  });
+}
+
+// Queue consumer
+async function processWebhookQueue(job: WebhookJob) {
+  try {
+    await acp.webhooks.sendOrderUpdated(job.sessionId, {
+      webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+      secret: process.env.OPENAI_WEBHOOK_SECRET!,
+      status: job.status,
+    });
+  } catch (error) {
+    // Retry logic handled by queue
+    throw error;
+  }
+}
+```
+
+**Next.js with `after()`** (fire and forget):
 
 ```typescript
 import { after } from 'next/server';
-import { createOutboundWebhook } from 'acp-handler';
 
-// Create webhook helper with signing
-const webhook = createOutboundWebhook({
-  webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-  secret: process.env.OPENAI_WEBHOOK_SECRET,
-  merchantName: process.env.MERCHANT_NAME || 'YourStore',
-});
+async function markOrderShipped(sessionId: string) {
+  // Update order status
+  await db.orders.update({ ... });
 
-const webhooks = {
-  orderUpdated: async ({ checkout_session_id, status, order }) => {
-    // Send webhook in background (non-blocking)
-    after(async () => {
-      try {
-        await webhook.orderUpdated({
-          checkout_session_id,
-          status,
-          order: order ? {
-            id: order.id,
-            status: order.status,
-            total: order.total,
-            items: order.items,
-            customer: order.customer,
-            created_at: order.created_at,
-          } : undefined,
-          permalink_url: order
-            ? `${process.env.NEXT_PUBLIC_URL}/orders/${order.id}`
-            : undefined,
-        });
-
-        console.log(`✓ Webhook sent for ${checkout_session_id}: ${status}`);
-      } catch (error) {
-        console.error('✗ Webhook delivery failed:', error);
-
-        // Log to monitoring service for retry
-        await logWebhookFailure({
-          session_id: checkout_session_id,
-          status,
-          error: error.message,
-        });
-      }
-    });
-  },
-};
+  // Send webhook in background (non-blocking)
+  after(async () => {
+    try {
+      await acp.webhooks.sendOrderUpdated(sessionId, {
+        webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+        secret: process.env.OPENAI_WEBHOOK_SECRET!,
+        status: 'shipped',
+      });
+    } catch (error) {
+      console.error('Webhook failed:', error);
+      // Log for manual retry
+    }
+  });
+}
 ```
 
-### Custom Implementation with Retry Logic
+**With audit trail**:
 
 ```typescript
-const webhooks = {
-  orderUpdated: async ({ checkout_session_id, status, order }) => {
-    const payload = {
-      event: 'order_updated',
-      checkout_session_id,
+async function sendWebhookWithAudit(sessionId: string, status: string) {
+  // Store webhook event in database
+  const event = await db.webhookEvents.create({
+    data: {
+      session_id: sessionId,
       status,
-      order,
-      permalink_url: order
-        ? `${process.env.NEXT_PUBLIC_URL}/orders/${order.id}`
-        : undefined,
-    };
+      sent_at: null,
+    },
+  });
 
-    // Enqueue for reliable delivery with retries
-    await webhookQueue.enqueue({
-      url: process.env.OPENAI_WEBHOOK_URL,
-      payload,
-      signature: signPayload(payload, process.env.OPENAI_WEBHOOK_SECRET),
-      maxRetries: 3,
-      retryDelays: [1000, 5000, 30000], // 1s, 5s, 30s
+  try {
+    await acp.webhooks.sendOrderUpdated(sessionId, {
+      webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+      secret: process.env.OPENAI_WEBHOOK_SECRET!,
+      status,
     });
-  },
-};
-```
 
-### Production-Ready Implementation
-
-```typescript
-import { createOutboundWebhook } from 'acp-handler';
-
-const webhook = createOutboundWebhook({
-  webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-  secret: process.env.OPENAI_WEBHOOK_SECRET,
-  merchantName: process.env.MERCHANT_NAME,
-});
-
-const webhooks = {
-  orderUpdated: async ({ checkout_session_id, status, order }) => {
-    // Store webhook event in database for audit trail
-    await db.webhookEvents.create({
+    // Mark as sent
+    await db.webhookEvents.update({
+      where: { id: event.id },
+      data: { sent_at: new Date(), success: true },
+    });
+  } catch (error) {
+    // Log failure
+    await db.webhookEvents.update({
+      where: { id: event.id },
       data: {
-        session_id: checkout_session_id,
-        status,
-        payload: { order },
-        sent_at: null, // Will update after sending
+        error: error.message,
+        retry_count: { increment: 1 },
       },
     });
-
-    // Send webhook (use queue in production)
-    try {
-      await webhook.orderUpdated({
-        checkout_session_id,
-        status,
-        order,
-        permalink_url: order
-          ? `${process.env.NEXT_PUBLIC_URL}/orders/${order.id}`
-          : undefined,
-      });
-
-      // Mark as sent
-      await db.webhookEvents.updateMany({
-        where: { session_id: checkout_session_id, status },
-        data: { sent_at: new Date(), success: true },
-      });
-
-    } catch (error) {
-      // Log failure
-      await db.webhookEvents.updateMany({
-        where: { session_id: checkout_session_id, status },
-        data: {
-          error: error.message,
-          retry_count: { increment: 1 },
-        },
-      });
-
-      // Alert monitoring
-      await alertOnWebhookFailure({
-        session_id: checkout_session_id,
-        error: error.message,
-      });
-
-      // Don't throw - webhook failures shouldn't fail the checkout
-      console.error('Webhook failed:', error);
-    }
-  },
-};
+    throw error; // Re-throw for queue retry
+  }
+}
 ```
 
 ## Storage

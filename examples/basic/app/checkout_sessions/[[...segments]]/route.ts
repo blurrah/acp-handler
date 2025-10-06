@@ -1,4 +1,5 @@
-import { acpHandler, createNextCatchAll, createStoreWithRedis } from "acp-handler";
+import { acpHandler, createStoreWithRedis } from "acp-handler";
+import { createNextCatchAll } from "acp-handler/next";
 
 // Not sure if needed
 export const dynamic = "force-dynamic";

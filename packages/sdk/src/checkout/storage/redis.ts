@@ -1,5 +1,5 @@
 import { createClient, type RedisClientType } from "redis";
-import { type KV, sessionStore } from "../storage";
+import type { KV } from "../storage";
 
 /**
  * Redis implementation of the KV interface for storing checkout sessions

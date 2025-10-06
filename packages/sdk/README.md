@@ -36,106 +36,93 @@ pnpm add next  # For Next.js catch-all route helper
 
 ## Quick Start
 
-### 1. Implement Required Handlers
+### 1. Define Your Handlers
+
+Create your ACP handler in a central location (e.g., `lib/acp.ts`) so you can reuse it throughout your app:
 
 ```typescript
-import { createHandlers } from 'acp-handler';
+import { acpHandler, createStoreWithRedis } from 'acp-handler';
 
-const handlers = createHandlers(
-  {
-    // Product pricing logic
-    products: {
-      price: async ({ items, customer, fulfillment }) => {
-        // Fetch products from your database
-        const products = await db.products.findMany({
-          where: { id: { in: items.map(i => i.id) } }
-        });
+// Wire up storage (uses REDIS_URL environment variable)
+const { store } = createStoreWithRedis('acp');
 
-        // Calculate pricing
-        const itemsWithPrices = items.map(item => {
-          const product = products.find(p => p.id === item.id);
-          return {
-            id: item.id,
-            title: product.name,
-            quantity: item.quantity,
-            unit_price: { amount: product.price, currency: 'USD' }
-          };
-        });
+// Create ACP handler with business logic
+export const acp = acpHandler({
+  // Product pricing logic
+  products: {
+    price: async ({ items, customer, fulfillment }) => {
+      // Fetch products from your database
+      const products = await db.products.findMany({
+        where: { id: { in: items.map(i => i.id) } }
+      });
 
-        const subtotal = itemsWithPrices.reduce(
-          (sum, item) => sum + item.unit_price.amount * item.quantity,
-          0
-        );
-
+      // Calculate pricing
+      const itemsWithPrices = items.map(item => {
+        const product = products.find(p => p.id === item.id);
         return {
-          items: itemsWithPrices,
-          totals: {
-            subtotal: { amount: subtotal, currency: 'USD' },
-            grand_total: { amount: subtotal, currency: 'USD' }
-          },
-          ready: true, // Ready for payment
+          id: item.id,
+          title: product.name,
+          quantity: item.quantity,
+          unit_price: { amount: product.price, currency: 'USD' }
         };
-      }
-    },
+      });
 
-    // Payment processing
-    payments: {
-      authorize: async ({ session, delegated_token }) => {
-        // Integrate with your payment provider (Stripe, etc.)
-        const intent = await stripe.paymentIntents.create({
-          amount: session.totals.grand_total.amount,
-          currency: session.totals.grand_total.currency,
-          payment_method: delegated_token,
-        });
+      const subtotal = itemsWithPrices.reduce(
+        (sum, item) => sum + item.unit_price.amount * item.quantity,
+        0
+      );
 
-        if (intent.status === 'requires_capture') {
-          return { ok: true, intent_id: intent.id };
-        }
-        return { ok: false, reason: 'Authorization failed' };
-      },
-
-      capture: async (intent_id) => {
-        const intent = await stripe.paymentIntents.capture(intent_id);
-        if (intent.status === 'succeeded') {
-          return { ok: true };
-        }
-        return { ok: false, reason: 'Capture failed' };
-      }
-    },
-
-    // Webhook notifications
-    webhooks: {
-      orderUpdated: async ({ checkout_session_id, status, order }) => {
-        // Notify ChatGPT about order updates
-        await fetch(process.env.OPENAI_WEBHOOK_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Signature': hmacSign(payload, secret)
-          },
-          body: JSON.stringify({ checkout_session_id, status, order })
-        });
-      }
+      return {
+        items: itemsWithPrices,
+        totals: {
+          subtotal: { amount: subtotal, currency: 'USD' },
+          grand_total: { amount: subtotal, currency: 'USD' }
+        },
+        ready: true, // Ready for payment
+      };
     }
   },
-  {
-    // Storage backend (Redis recommended)
-    store: createStoreWithRedis('acp')
-  }
-);
+
+  // Payment processing
+  payments: {
+    authorize: async ({ session, delegated_token }) => {
+      // Integrate with your payment provider (Stripe, etc.)
+      const intent = await stripe.paymentIntents.create({
+        amount: session.totals.grand_total.amount,
+        currency: session.totals.grand_total.currency,
+        payment_method: delegated_token,
+      });
+
+      if (intent.status === 'requires_capture') {
+        return { ok: true, intent_id: intent.id };
+      }
+      return { ok: false, reason: 'Authorization failed' };
+    },
+
+    capture: async (intent_id) => {
+      const intent = await stripe.paymentIntents.capture(intent_id);
+      if (intent.status === 'succeeded') {
+        return { ok: true };
+      }
+      return { ok: false, reason: 'Capture failed' };
+    }
+  },
+
+  // Storage backend (Redis recommended)
+  store
+});
 ```
 
-### 2. Mount Handlers to Your Framework
+### 2. Mount Route Handlers
 
 #### Next.js (App Router)
 
 ```typescript
 // app/checkout_sessions/[[...segments]]/route.ts
 import { createNextCatchAll } from 'acp-handler/next';
+import { acp } from '@/lib/acp'; // Your ACP handler
 
-const { GET, POST } = createNextCatchAll(handlers);
-
-export { GET, POST };
+export const { GET, POST } = createNextCatchAll(acp.handlers);
 ```
 
 #### Hono
@@ -274,7 +261,45 @@ The handlers use Web Standard APIs and work natively with:
 
 Just call the handlers directly with `Request` objects!
 
-### 3. Done!
+### 3. Send Webhooks (Optional)
+
+Webhooks notify OpenAI about post-checkout events like shipping or delivery. Since delegated tokens mean OpenAI already knows payment succeeded, webhooks are only needed for lifecycle updates:
+
+```typescript
+// warehouse/ship-order.ts
+import { acp } from '@/lib/acp';
+
+async function handleOrderShipped(sessionId: string, trackingNumber: string) {
+  // Send webhook notification to OpenAI
+  await acp.webhooks.sendOrderUpdated(sessionId, {
+    webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+    secret: process.env.OPENAI_WEBHOOK_SECRET!,
+    merchantName: 'YourStore',
+    status: 'shipped',
+  });
+}
+```
+
+### 4. Access Sessions Anywhere
+
+Use session utilities from admin panels, analytics, or other parts of your app:
+
+```typescript
+// app/admin/session/[id]/page.tsx
+import { acp } from '@/lib/acp';
+
+export default async function SessionPage({ params }: { params: { id: string } }) {
+  const session = await acp.sessions.get(params.id);
+
+  if (!session) {
+    return <div>Session not found</div>;
+  }
+
+  return <div>Session {session.id}: {session.status}</div>;
+}
+```
+
+### 5. Done!
 
 Your ACP-compliant checkout API is now ready. ChatGPT can create checkout sessions, update cart items, and complete purchases.
 
@@ -321,19 +346,25 @@ type Payments = {
 };
 ```
 
-### Webhooks Handler
+### Webhooks
 
-Notifies ChatGPT about order updates (completion, cancellation, etc.).
+Send notifications to OpenAI about post-checkout events. With delegated tokens, OpenAI already knows when payment succeeds, so webhooks are only needed for lifecycle updates:
 
 ```typescript
-type Webhooks = {
-  orderUpdated(evt: {
-    checkout_session_id: string;
-    status: string;
-    order?: Order;
-  }): Promise<void>;
-};
+// From anywhere in your app
+await acp.webhooks.sendOrderUpdated(sessionId, {
+  webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+  secret: process.env.OPENAI_WEBHOOK_SECRET!,
+  merchantName: 'YourStore',
+  status: 'shipped', // or 'delivered', 'canceled', etc.
+});
 ```
+
+**Common use cases:**
+- Order shipped from warehouse
+- Order delivered
+- Order canceled after payment
+- Refund issued
 
 ### Storage
 
@@ -361,18 +392,17 @@ const { store } = createStoreWithRedis('namespace');
 Verify that requests are actually from OpenAI/ChatGPT and haven't been tampered with:
 
 ```typescript
-import { createHandlers } from 'acp-handler';
+import { acpHandler } from 'acp-handler';
 
-const handlers = createHandlers(
-  { products, payments, webhooks },
-  {
-    store,
-    signature: {
-      secret: process.env.OPENAI_WEBHOOK_SECRET, // Provided by OpenAI
-      toleranceSec: 300 // Optional: 5 minutes default
-    }
+const acp = acpHandler({
+  products,
+  payments,
+  store,
+  signature: {
+    secret: process.env.OPENAI_WEBHOOK_SECRET, // Provided by OpenAI
+    toleranceSec: 300 // Optional: 5 minutes default
   }
-);
+});
 ```
 
 **How it works:**
@@ -410,13 +440,16 @@ Add distributed tracing to monitor performance:
 
 ```typescript
 import { trace } from '@opentelemetry/api';
+import { acpHandler } from 'acp-handler';
 
 const tracer = trace.getTracer('my-shop');
 
-const handlers = createHandlers(
-  { products, payments, webhooks },
-  { store, tracer } // Add tracer
-);
+const acp = acpHandler({
+  products,
+  payments,
+  store,
+  tracer // Add tracer
+});
 ```
 
 **Spans created:**
@@ -435,21 +468,29 @@ const handlers = createHandlers(
 The package provides test helpers for integration testing:
 
 ```typescript
-import { createMemoryStore, createMockProducts } from 'acp-handler/test';
+import {
+  acpHandler,
+  createMemoryStore,
+  createMockProducts,
+  createMockPayments
+} from 'acp-handler/test';
 
-const handlers = createHandlers(
-  {
-    products: createMockProducts(),
-    payments: createMockPayments(),
-    webhooks: createMockWebhooks()
-  },
-  { store: createMemoryStore() }
-);
+const acp = acpHandler({
+  products: createMockProducts(),
+  payments: createMockPayments(),
+  store: createMemoryStore()
+});
 
 // Test complete checkout flow
-const res = await handlers.create(req, { items: [...] });
+const res = await acp.handlers.create(req, { items: [...] });
 const session = await res.json();
-// ...
+
+// Test webhook utilities
+await acp.webhooks.sendOrderUpdated(session.id, {
+  webhookUrl: 'https://test.example.com/webhook',
+  secret: 'test-secret',
+  status: 'shipped'
+});
 ```
 
 ## Examples
@@ -468,23 +509,30 @@ pnpm dev
 
 ## API Reference
 
-### `createHandlers(handlers, options)`
+### `acpHandler(config)`
 
-Creates checkout handlers implementing the ACP spec.
+Creates an ACP handler with reusable utilities for checkout, webhooks, and sessions.
 
 **Parameters:**
-- `handlers.products: Products` - Product pricing implementation
-- `handlers.payments: Payments` - Payment processing implementation
-- `handlers.webhooks: Webhooks` - Webhook notifications
-- `options.store: KV` - Key-value storage backend
-- `options.tracer?: Tracer` - OpenTelemetry tracer (optional)
+- `config.products: Products` - Product pricing implementation
+- `config.payments: Payments` - Payment processing implementation
+- `config.store: KV` - Key-value storage backend
+- `config.sessions?: SessionStore` - Custom session storage (optional, defaults to Redis-backed store)
+- `config.tracer?: Tracer` - OpenTelemetry tracer (optional)
+- `config.signature?: SignatureConfig` - Signature verification config (optional)
 
-**Returns:** Handlers object with methods:
-- `create(req, body)` - POST /checkout_sessions
-- `update(req, id, body)` - POST /checkout_sessions/:id
-- `complete(req, id, body)` - POST /checkout_sessions/:id/complete
-- `cancel(req, id)` - POST /checkout_sessions/:id/cancel
-- `get(req, id)` - GET /checkout_sessions/:id
+**Returns:** Object with:
+- `handlers` - Route handlers for checkout API:
+  - `create(req, body)` - POST /checkout_sessions
+  - `update(req, id, body)` - POST /checkout_sessions/:id
+  - `complete(req, id, body)` - POST /checkout_sessions/:id/complete
+  - `cancel(req, id)` - POST /checkout_sessions/:id/cancel
+  - `get(req, id)` - GET /checkout_sessions/:id
+- `webhooks` - Webhook utilities:
+  - `sendOrderUpdated(sessionId, config)` - Send order update webhook
+- `sessions` - Session utilities:
+  - `get(id)` - Get checkout session by ID
+  - `put(session, ttl?)` - Store checkout session
 
 ### `createNextCatchAll(handlers, schemas?)`
 
@@ -508,25 +556,6 @@ import { createStoreWithRedis } from 'acp-handler';
 const { store } = createStoreWithRedis('acp');
 ```
 
-### `createOutboundWebhook(config)`
-
-Helper for signing outbound webhooks to ChatGPT.
-
-```typescript
-import { createOutboundWebhook } from 'acp-handler';
-
-const webhook = createOutboundWebhook({
-  webhookUrl: process.env.OPENAI_WEBHOOK_URL,
-  secret: process.env.OPENAI_WEBHOOK_SECRET,
-  merchantName: 'YourStore'
-});
-
-await webhook.orderUpdated({
-  checkout_session_id: session.id,
-  status: 'completed',
-  order: { id: 'order_123', status: 'placed' }
-});
-```
 
 ## Project Structure
 

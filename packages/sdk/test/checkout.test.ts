@@ -4,7 +4,6 @@ import {
 	createMemoryStore,
 	createMockPayments,
 	createMockProducts,
-	createMockWebhooks,
 	createRequest,
 } from "../src/test";
 
@@ -12,16 +11,14 @@ describe("Checkout Integration", () => {
 	let handlers: ReturnType<typeof createHandlers>;
 	let products: ReturnType<typeof createMockProducts>;
 	let payments: ReturnType<typeof createMockPayments>;
-	let webhooks: ReturnType<typeof createMockWebhooks>;
 	let store: ReturnType<typeof createMemoryStore>;
 
 	beforeEach(() => {
 		products = createMockProducts();
 		payments = createMockPayments();
-		webhooks = createMockWebhooks();
 		store = createMemoryStore();
 
-		handlers = createHandlers({ products, payments, webhooks }, { store });
+		handlers = createHandlers({ products, payments }, { store });
 	});
 
 	describe("Complete checkout flow", () => {
@@ -112,13 +109,6 @@ describe("Checkout Integration", () => {
 			// 4. Verify payments were called
 			expect((payments as any)._calls.authorize).toBe(1);
 			expect((payments as any)._calls.capture).toBe(1);
-
-			// 5. Verify webhook was sent
-			expect((webhooks as any)._calls).toHaveLength(1);
-			expect((webhooks as any)._calls[0]).toMatchObject({
-				checkout_session_id: session.id,
-				status: "completed",
-			});
 		});
 	});
 
@@ -232,7 +222,7 @@ describe("Checkout Integration", () => {
 				authorizeReason: "Card declined",
 			});
 
-			handlers = createHandlers({ products, payments, webhooks }, { store });
+			handlers = createHandlers({ products, payments }, { store });
 
 			// Create session
 			const createReq = createRequest("http://test/checkout_sessions", {
@@ -331,7 +321,7 @@ describe("Checkout Integration", () => {
 	});
 
 	describe("Cancel flow", () => {
-		it("should cancel a session and emit webhook", async () => {
+		it("should cancel a session", async () => {
 			// Create session
 			const createReq = createRequest("http://test/checkout_sessions", {
 				method: "POST",
@@ -352,13 +342,6 @@ describe("Checkout Integration", () => {
 			expect(cancelRes.status).toBe(200);
 			const canceled = await cancelRes.json();
 			expect(canceled.status).toBe("canceled");
-
-			// Verify webhook was sent
-			expect((webhooks as any)._calls).toHaveLength(1);
-			expect((webhooks as any)._calls[0]).toMatchObject({
-				checkout_session_id: session.id,
-				status: "canceled",
-			});
 		});
 	});
 });

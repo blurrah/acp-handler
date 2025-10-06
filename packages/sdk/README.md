@@ -36,7 +36,7 @@ pnpm add next  # For Next.js catch-all route helper
 
 ## Quick Start
 
-### 1. Define Your Handlers
+### 1. Define Your ACP Handler
 
 Create your ACP handler in a central location (e.g., `lib/acp.ts`) so you can reuse it throughout your app:
 
@@ -47,7 +47,7 @@ import { acpHandler, createStoreWithRedis } from 'acp-handler';
 const { store } = createStoreWithRedis('acp');
 
 // Create ACP handler with business logic
-export const acp = acpHandler({
+const { handlers, webhooks, sessions } = acpHandler({
   // Product pricing logic
   products: {
     price: async ({ items, customer, fulfillment }) => {
@@ -111,6 +111,8 @@ export const acp = acpHandler({
   // Storage backend (Redis recommended)
   store
 });
+
+export { handlers, webhooks, sessions };
 ```
 
 ### 2. Mount Route Handlers
@@ -120,9 +122,9 @@ export const acp = acpHandler({
 ```typescript
 // app/checkout_sessions/[[...segments]]/route.ts
 import { createNextCatchAll } from 'acp-handler/next';
-import { acp } from '@/lib/acp'; // Your ACP handler
+import { handlers } from '@/lib/acp';
 
-export const { GET, POST } = createNextCatchAll(acp.handlers);
+export const { GET, POST } = createNextCatchAll(handlers);
 ```
 
 #### Hono
@@ -132,9 +134,10 @@ Hono natively supports Web Standard APIs, so no adapter needed:
 ```typescript
 // server.ts
 import { Hono } from 'hono';
-import { handlers } from './checkout-handlers';
-import { parseJSON, validateBody } from 'acp-handler';
+import { handlers } from './lib/acp';
 import {
+  parseJSON,
+  validateBody,
   CreateCheckoutSessionSchema,
   UpdateCheckoutSessionSchema,
   CompleteCheckoutSessionSchema,
@@ -191,9 +194,10 @@ pnpm add @whatwg-node/server
 // server.ts
 import express from 'express';
 import { createServerAdapter } from '@whatwg-node/server';
-import { handlers } from './checkout-handlers';
-import { parseJSON, validateBody } from 'acp-handler';
+import { handlers } from './lib/acp';
 import {
+  parseJSON,
+  validateBody,
   CreateCheckoutSessionSchema,
   UpdateCheckoutSessionSchema,
   CompleteCheckoutSessionSchema,
@@ -267,11 +271,11 @@ Webhooks notify OpenAI about post-checkout events like shipping or delivery. Sin
 
 ```typescript
 // warehouse/ship-order.ts
-import { acp } from '@/lib/acp';
+import { webhooks } from '@/lib/acp';
 
 async function handleOrderShipped(sessionId: string, trackingNumber: string) {
   // Send webhook notification to OpenAI
-  await acp.webhooks.sendOrderUpdated(sessionId, {
+  await webhooks.sendOrderUpdated(sessionId, {
     webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
     secret: process.env.OPENAI_WEBHOOK_SECRET!,
     merchantName: 'YourStore',
@@ -286,10 +290,10 @@ Use session utilities from admin panels, analytics, or other parts of your app:
 
 ```typescript
 // app/admin/session/[id]/page.tsx
-import { acp } from '@/lib/acp';
+import { sessions } from '@/lib/acp';
 
 export default async function SessionPage({ params }: { params: { id: string } }) {
-  const session = await acp.sessions.get(params.id);
+  const session = await sessions.get(params.id);
 
   if (!session) {
     return <div>Session not found</div>;
@@ -352,7 +356,9 @@ Send notifications to OpenAI about post-checkout events. With delegated tokens, 
 
 ```typescript
 // From anywhere in your app
-await acp.webhooks.sendOrderUpdated(sessionId, {
+import { webhooks } from '@/lib/acp';
+
+await webhooks.sendOrderUpdated(sessionId, {
   webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
   secret: process.env.OPENAI_WEBHOOK_SECRET!,
   merchantName: 'YourStore',
@@ -394,7 +400,7 @@ Verify that requests are actually from OpenAI/ChatGPT and haven't been tampered 
 ```typescript
 import { acpHandler } from 'acp-handler';
 
-const acp = acpHandler({
+const { handlers, webhooks, sessions } = acpHandler({
   products,
   payments,
   store,
@@ -403,6 +409,8 @@ const acp = acpHandler({
     toleranceSec: 300 // Optional: 5 minutes default
   }
 });
+
+export { handlers, webhooks, sessions };
 ```
 
 **How it works:**
@@ -444,12 +452,14 @@ import { acpHandler } from 'acp-handler';
 
 const tracer = trace.getTracer('my-shop');
 
-const acp = acpHandler({
+const { handlers, webhooks, sessions } = acpHandler({
   products,
   payments,
   store,
   tracer // Add tracer
 });
+
+export { handlers, webhooks, sessions };
 ```
 
 **Spans created:**
@@ -475,18 +485,18 @@ import {
   createMockPayments
 } from 'acp-handler/test';
 
-const acp = acpHandler({
+const { handlers, webhooks, sessions } = acpHandler({
   products: createMockProducts(),
   payments: createMockPayments(),
   store: createMemoryStore()
 });
 
 // Test complete checkout flow
-const res = await acp.handlers.create(req, { items: [...] });
+const res = await handlers.create(req, { items: [...] });
 const session = await res.json();
 
 // Test webhook utilities
-await acp.webhooks.sendOrderUpdated(session.id, {
+await webhooks.sendOrderUpdated(session.id, {
   webhookUrl: 'https://test.example.com/webhook',
   secret: 'test-secret',
   status: 'shipped'
@@ -498,7 +508,7 @@ await acp.webhooks.sendOrderUpdated(session.id, {
 See the [`examples/basic`](./examples/basic) directory for a complete Next.js implementation with:
 - AI chat demo (simulate ChatGPT)
 - Complete checkout flow
-- Mock products, payments, and webhooks
+- Mock products and payments
 - Redis storage
 
 ```bash
@@ -555,7 +565,6 @@ import { createStoreWithRedis } from 'acp-handler';
 // Uses REDIS_URL environment variable
 const { store } = createStoreWithRedis('acp');
 ```
-
 
 ## Project Structure
 

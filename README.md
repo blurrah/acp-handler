@@ -265,20 +265,33 @@ The handlers use Web Standard APIs and work natively with:
 
 Just call the handlers directly with `Request` objects!
 
-### 3. Send Webhooks (Optional)
+### 3. Send Webhooks
 
-Webhooks notify OpenAI about post-checkout events like shipping or delivery. Since delegated tokens mean OpenAI already knows payment succeeded, webhooks are only needed for lifecycle updates:
+Webhooks notify OpenAI about order events. You should send an `order_created` webhook after checkout completes, and `order_updated` webhooks for lifecycle changes:
 
 ```typescript
-// warehouse/ship-order.ts
+// queue/send-order-created.ts
 import { webhooks } from '@/lib/acp';
 
-async function handleOrderShipped(sessionId: string, trackingNumber: string) {
-  // Send webhook notification to OpenAI
+async function sendOrderCreated(sessionId: string, orderId: string) {
+  // Send order created webhook after checkout completes
+  await webhooks.sendOrderCreated(sessionId, {
+    webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+    secret: process.env.OPENAI_WEBHOOK_SECRET!,
+    merchantName: 'YourStore',
+    permalinkUrl: `https://yourstore.com/orders/${orderId}`,
+    status: 'created', // or 'confirmed', 'manual_review'
+  });
+}
+
+// warehouse/ship-order.ts
+async function handleOrderShipped(sessionId: string, orderId: string) {
+  // Send order updated webhook when order ships
   await webhooks.sendOrderUpdated(sessionId, {
     webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
     secret: process.env.OPENAI_WEBHOOK_SECRET!,
     merchantName: 'YourStore',
+    permalinkUrl: `https://yourstore.com/orders/${orderId}`,
     status: 'shipped',
   });
 }
@@ -352,25 +365,53 @@ type Payments = {
 
 ### Webhooks
 
-Send notifications to OpenAI about post-checkout events. With delegated tokens, OpenAI already knows when payment succeeds, so webhooks are only needed for lifecycle updates:
+Send notifications to OpenAI about order events:
 
+**Order Created** - Send after checkout completes:
 ```typescript
-// From anywhere in your app
 import { webhooks } from '@/lib/acp';
 
+await webhooks.sendOrderCreated(sessionId, {
+  webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+  secret: process.env.OPENAI_WEBHOOK_SECRET!,
+  merchantName: 'YourStore',
+  permalinkUrl: 'https://yourstore.com/orders/123',
+  status: 'created', // 'created' | 'confirmed' | 'manual_review'
+});
+```
+
+**Order Updated** - Send for lifecycle changes:
+```typescript
 await webhooks.sendOrderUpdated(sessionId, {
   webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
   secret: process.env.OPENAI_WEBHOOK_SECRET!,
   merchantName: 'YourStore',
-  status: 'shipped', // or 'delivered', 'canceled', etc.
+  permalinkUrl: 'https://yourstore.com/orders/123',
+  status: 'shipped', // 'shipped' | 'fulfilled' | 'canceled'
 });
 ```
 
-**Common use cases:**
-- Order shipped from warehouse
-- Order delivered
-- Order canceled after payment
-- Refund issued
+**Refunds:**
+```typescript
+await webhooks.sendOrderUpdated(sessionId, {
+  webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
+  secret: process.env.OPENAI_WEBHOOK_SECRET!,
+  merchantName: 'YourStore',
+  permalinkUrl: 'https://yourstore.com/orders/123',
+  status: 'canceled',
+  refunds: [
+    { type: 'original_payment', amount: 2999 }, // Amount in cents
+  ],
+});
+```
+
+**Available Status Values:**
+- `created` - Order placed
+- `manual_review` - Requires manual review
+- `confirmed` - Order confirmed
+- `canceled` - Order canceled
+- `shipped` - Order shipped
+- `fulfilled` - Order fulfilled
 
 ### Storage
 
@@ -496,9 +537,17 @@ const res = await handlers.create(req, { items: [...] });
 const session = await res.json();
 
 // Test webhook utilities
+await webhooks.sendOrderCreated(session.id, {
+  webhookUrl: 'https://test.example.com/webhook',
+  secret: 'test-secret',
+  permalinkUrl: 'https://test.example.com/orders/123',
+  status: 'created'
+});
+
 await webhooks.sendOrderUpdated(session.id, {
   webhookUrl: 'https://test.example.com/webhook',
   secret: 'test-secret',
+  permalinkUrl: 'https://test.example.com/orders/123',
   status: 'shipped'
 });
 ```
@@ -539,7 +588,8 @@ Creates an ACP handler with reusable utilities for checkout, webhooks, and sessi
   - `cancel(req, id)` - POST /checkout_sessions/:id/cancel
   - `get(req, id)` - GET /checkout_sessions/:id
 - `webhooks` - Webhook utilities:
-  - `sendOrderUpdated(sessionId, config)` - Send order update webhook
+  - `sendOrderCreated(sessionId, config)` - Send order created webhook
+  - `sendOrderUpdated(sessionId, config)` - Send order updated webhook
 - `sessions` - Session utilities:
   - `get(id)` - Get checkout session by ID
   - `put(session, ttl?)` - Store checkout session

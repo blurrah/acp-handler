@@ -85,3 +85,32 @@ export type Order = {
 	status: "placed" | "failed" | "refunded";
 	permalink_url?: string;
 };
+
+// Webhook types based on ACP spec
+export type OrderStatus =
+	| "created"
+	| "manual_review"
+	| "confirmed"
+	| "canceled"
+	| "shipped"
+	| "fulfilled";
+
+export type RefundType = "store_credit" | "original_payment";
+
+export type Refund = {
+	type: RefundType;
+	amount: number; // Must be >= 0
+};
+
+export type OrderEventData = {
+	type: "order";
+	checkout_session_id: string;
+	permalink_url: string;
+	status: OrderStatus;
+	refunds?: Refund[];
+};
+
+export type WebhookEvent = {
+	type: "order_created" | "order_updated";
+	data: OrderEventData;
+};

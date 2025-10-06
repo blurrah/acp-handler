@@ -65,20 +65,24 @@ export { GET, POST };
 // Webhooks are now called separately from other parts of your app
 // For example, from a queue worker after checkout completes:
 //
-// import { acp } from './checkout_sessions/[[...segments]]/route'
+// import { webhooks } from '@/lib/acp'
 //
-// async function processWebhook(sessionId: string) {
-//   await acp.webhooks.sendOrderUpdated(sessionId, {
+// async function sendOrderCreatedWebhook(sessionId: string, orderId: string) {
+//   await webhooks.sendOrderCreated(sessionId, {
 //     webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
 //     secret: process.env.OPENAI_WEBHOOK_SECRET!,
 //     merchantName: 'YourStore',
+//     permalinkUrl: `https://yourstore.com/orders/${orderId}`,
+//     status: 'created',
 //   });
 // }
 //
 // Or from your warehouse system when an order ships:
 //
-// await acp.webhooks.sendOrderUpdated(sessionId, {
+// await webhooks.sendOrderUpdated(sessionId, {
 //   webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
 //   secret: process.env.OPENAI_WEBHOOK_SECRET!,
+//   merchantName: 'YourStore',
+//   permalinkUrl: `https://yourstore.com/orders/${orderId}`,
 //   status: 'shipped',
 // });

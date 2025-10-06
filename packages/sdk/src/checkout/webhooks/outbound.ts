@@ -1,14 +1,5 @@
 import { hmacSign } from "../crypto.ts";
-import type { Order } from "../types.ts";
-
-export type WebhookEvent = {
-	event: "order_created" | "order_updated";
-	checkout_session_id: string;
-	order?: Order;
-	status: string;
-	permalink_url?: string;
-	refunds?: Array<{ id: string; amount: number; reason?: string }>;
-};
+import type { OrderEventData, WebhookEvent } from "../types.ts";
 
 export type OutboundConfig = {
 	webhookUrl: string;
@@ -48,9 +39,9 @@ export function createOutboundWebhook(config: OutboundConfig) {
 	}
 
 	return {
-		orderCreated: (evt: Omit<WebhookEvent, "event">): Promise<void> =>
-			sendWebhook({ ...evt, event: "order_created" }),
-		orderUpdated: (evt: Omit<WebhookEvent, "event">): Promise<void> =>
-			sendWebhook({ ...evt, event: "order_updated" }),
+		orderCreated: (data: OrderEventData): Promise<void> =>
+			sendWebhook({ type: "order_created", data }),
+		orderUpdated: (data: OrderEventData): Promise<void> =>
+			sendWebhook({ type: "order_updated", data }),
 	};
 }

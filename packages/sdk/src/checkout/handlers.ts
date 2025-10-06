@@ -13,6 +13,8 @@ import type {
 	CompleteCheckoutSessionRequest,
 	CreateCheckoutSessionRequest,
 	Order,
+	OrderStatus,
+	Refund,
 	UpdateCheckoutSessionRequest,
 } from "./types.ts";
 
@@ -557,9 +559,48 @@ export function acpHandler(config: {
 		 */
 		webhooks: {
 			/**
+			 * Send order created webhook
+			 * @param sessionId - Checkout session ID
+			 * @param data - Webhook event data
+			 */
+			async sendOrderCreated(
+				sessionId: string,
+				webhookConfig: {
+					webhookUrl: string;
+					secret: string;
+					merchantName?: string;
+					permalinkUrl: string;
+					status?: OrderStatus;
+					refunds?: Refund[];
+				},
+			): Promise<void> {
+				const session = await sessions.get(sessionId);
+				if (!session) {
+					throw new Error(`Session "${sessionId}" not found`);
+				}
+
+				const { createOutboundWebhook } = await import(
+					"./webhooks/outbound.ts"
+				);
+				const webhook = createOutboundWebhook({
+					webhookUrl: webhookConfig.webhookUrl,
+					secret: webhookConfig.secret,
+					merchantName: webhookConfig.merchantName,
+				});
+
+				await webhook.orderCreated({
+					type: "order",
+					checkout_session_id: sessionId,
+					permalink_url: webhookConfig.permalinkUrl,
+					status: webhookConfig.status ?? "created",
+					refunds: webhookConfig.refunds,
+				});
+			},
+
+			/**
 			 * Send order updated webhook
 			 * @param sessionId - Checkout session ID
-			 * @param status - Optional status override (defaults to session status)
+			 * @param data - Webhook event data
 			 */
 			async sendOrderUpdated(
 				sessionId: string,
@@ -567,8 +608,9 @@ export function acpHandler(config: {
 					webhookUrl: string;
 					secret: string;
 					merchantName?: string;
-					status?: string;
-					order?: Order;
+					permalinkUrl: string;
+					status: OrderStatus;
+					refunds?: Refund[];
 				},
 			): Promise<void> {
 				const session = await sessions.get(sessionId);
@@ -586,9 +628,11 @@ export function acpHandler(config: {
 				});
 
 				await webhook.orderUpdated({
+					type: "order",
 					checkout_session_id: sessionId,
-					status: webhookConfig.status ?? session.status,
-					order: webhookConfig.order,
+					permalink_url: webhookConfig.permalinkUrl,
+					status: webhookConfig.status,
+					refunds: webhookConfig.refunds,
 				});
 			},
 		},

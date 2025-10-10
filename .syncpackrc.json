@@ -1,0 +1,9 @@
+{
+    "versionGroups": [
+      {
+        "dependencies": ["zod"],
+        "pinVersion": "^3",
+        "packages": ["ai-chatbot"]
+      }
+    ]
+  }

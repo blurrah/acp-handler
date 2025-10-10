@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { STORE_NAME } from "@/lib/store/catalog";
 
 interface Product {
@@ -18,9 +19,23 @@ interface Product {
 
 interface ProductGridProps {
   products: Product[];
+  onAddToCart?: (productId: string, quantity: number) => void;
 }
 
-export function ProductGrid({ products }: ProductGridProps) {
+export function ProductGrid({ products, onAddToCart }: ProductGridProps) {
+  const [loadingProduct, setLoadingProduct] = useState<string | null>(null);
+
+  const handleAddToCart = async (productId: string) => {
+    setLoadingProduct(productId);
+    try {
+      if (onAddToCart) {
+        await onAddToCart(productId, 1);
+      }
+    } finally {
+      setLoadingProduct(null);
+    }
+  };
+
   return (
     <div className="rounded-2xl border bg-background p-6">
       <div className="mb-6">
@@ -64,6 +79,16 @@ export function ProductGrid({ products }: ProductGridProps) {
 
               {/* Store Badge */}
               <p className="text-sm text-muted-foreground">{STORE_NAME}</p>
+
+              {/* Add to Cart Button */}
+              <button
+                type="button"
+                onClick={() => handleAddToCart(product.id)}
+                disabled={loadingProduct === product.id}
+                className="mt-2 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {loadingProduct === product.id ? "Adding..." : "Add to Cart"}
+              </button>
             </div>
           </div>
         ))}

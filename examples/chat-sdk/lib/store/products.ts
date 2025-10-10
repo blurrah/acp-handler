@@ -114,6 +114,7 @@ export const createFakeProductsHandler = (): Products => ({
       },
       fulfillment: {
         options: fulfillmentOptions,
+        selected_id: fulfillment?.selected_id, // Preserve the selected_id
       },
       ready,
     };

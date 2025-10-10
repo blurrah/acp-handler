@@ -39,7 +39,7 @@ function isCheckoutOutput(output: any): output is CheckoutOutput {
 function isCompleteCheckoutOutput(
   output: any
 ): output is CompleteCheckoutOutput {
-  return isCheckoutOutput(output) && output.estimated_delivery;
+  return isCheckoutOutput(output) && "estimated_delivery" in output;
 }
 
 export function SearchProductsResult({ output }: { output: any }) {

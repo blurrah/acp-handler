@@ -6,21 +6,21 @@ import type { Webhooks } from "acp-handler";
  * For demo, we just log to console
  */
 export const createFakeWebhooksHandler = (): Webhooks => ({
-  async orderUpdated({ session, webhook_url }) {
+  async orderUpdated({ checkout_session_id, status, order }) {
     // Log order update
     console.log("📦 Order Updated Webhook");
-    console.log("Session ID:", session.id);
-    console.log("Status:", session.status);
-    console.log("Webhook URL:", webhook_url);
+    console.log("Session ID:", checkout_session_id);
+    console.log("Status:", status);
+    if (order) {
+      console.log("Order ID:", order.id);
+    }
     console.log("---");
 
-    // In production, you would POST to webhook_url
+    // In production, you would POST to the agent's webhook_url
     // For demo, we just log
-    if (session.status === "completed") {
+    if (status === "completed") {
       console.log("🎉 Order completed!");
-      console.log("Total:", session.totals.total);
-      console.log("Items:", session.line_items.length);
-    } else if (session.status === "canceled") {
+    } else if (status === "canceled") {
       console.log("❌ Order canceled");
     }
 

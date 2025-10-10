@@ -37,17 +37,18 @@ export const createFakeProductsHandler = (): Products => ({
       return {
         id: item.id,
         quantity: item.quantity,
-        name: product.name,
-        description: product.description,
+        title: product.name,
         image_url: product.image,
         unit_price: unitPrice,
-        total,
       };
     });
 
     // Calculate subtotal
     const subtotal = {
-      amount: lineItems.reduce((sum, item) => sum + item.total.amount, 0),
+      amount: lineItems.reduce(
+        (sum, item) => sum + item.unit_price.amount * item.quantity,
+        0
+      ),
       currency: "USD",
     };
 
@@ -55,17 +56,13 @@ export const createFakeProductsHandler = (): Products => ({
     const fulfillmentOptions = [
       {
         id: "standard",
-        type: "shipping" as const,
         label: "Standard",
-        description: "5-7 business days",
-        amount: { amount: 500, currency: "USD" }, // $5.00
+        price: { amount: 500, currency: "USD" }, // $5.00
       },
       {
         id: "express",
-        type: "shipping" as const,
         label: "Express",
-        description: "2-3 business days",
-        amount: { amount: 1500, currency: "USD" }, // $15.00
+        price: { amount: 1500, currency: "USD" }, // $15.00
       },
     ];
 
@@ -76,7 +73,7 @@ export const createFakeProductsHandler = (): Products => ({
         (opt) => opt.id === fulfillment.selected_id
       );
       if (selectedFulfillment) {
-        shippingAmount = selectedFulfillment.amount.amount;
+        shippingAmount = selectedFulfillment.price.amount;
       }
     }
 
@@ -91,8 +88,8 @@ export const createFakeProductsHandler = (): Products => ({
       currency: "USD",
     };
 
-    // Calculate total
-    const total = {
+    // Calculate grand total
+    const grand_total = {
       amount: subtotal.amount + shipping.amount + tax.amount,
       currency: "USD",
     };
@@ -110,7 +107,7 @@ export const createFakeProductsHandler = (): Products => ({
         subtotal,
         shipping,
         tax,
-        total,
+        grand_total,
       },
       fulfillment: {
         options: fulfillmentOptions,

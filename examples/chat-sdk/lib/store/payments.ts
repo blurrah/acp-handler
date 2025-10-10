@@ -9,7 +9,7 @@ export const createFakePaymentsHandler = (): Payments => ({
   async authorize({ session }) {
     // Simulate payment authorization
     console.log("💳 Authorizing payment for session:", session.id);
-    console.log("Amount:", session.totals.total);
+    console.log("Amount:", session.totals.grand_total);
 
     // Generate fake payment intent ID
     const intentId = `pi_fake_${nanoid(16)}`;

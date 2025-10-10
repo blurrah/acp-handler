@@ -25,6 +25,7 @@
 			"cache": false
 		},
 		"ai-chatbot#build": {
+			"dependsOn": ["^build"],
 			"env": ["POSTGRES_URL", "BLOB_READ_WRITE_TOKEN"]
 		}
 	}

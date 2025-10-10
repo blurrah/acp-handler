@@ -26,6 +26,10 @@ import { createDocument } from "@/lib/ai/tools/create-document";
 import { getWeather } from "@/lib/ai/tools/get-weather";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
+import { createSearchProductsTool } from "@/lib/ai/tools/search-products";
+import { createCreateCheckoutTool } from "@/lib/ai/tools/create-checkout";
+import { createUpdateCheckoutTool } from "@/lib/ai/tools/update-checkout";
+import { createCompleteCheckoutTool } from "@/lib/ai/tools/complete-checkout";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
@@ -188,6 +192,10 @@ export async function POST(request: Request) {
                   "createDocument",
                   "updateDocument",
                   "requestSuggestions",
+                  "searchProducts",
+                  "createCheckout",
+                  "updateCheckout",
+                  "completeCheckout",
                 ],
           experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
@@ -198,6 +206,10 @@ export async function POST(request: Request) {
               session,
               dataStream,
             }),
+            searchProducts: createSearchProductsTool(),
+            createCheckout: createCreateCheckoutTool(),
+            updateCheckout: createUpdateCheckoutTool(),
+            completeCheckout: createCompleteCheckoutTool(),
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

@@ -5,6 +5,10 @@ import type { createDocument } from "./ai/tools/create-document";
 import type { getWeather } from "./ai/tools/get-weather";
 import type { requestSuggestions } from "./ai/tools/request-suggestions";
 import type { updateDocument } from "./ai/tools/update-document";
+import type { createSearchProductsTool } from "./ai/tools/search-products";
+import type { createCreateCheckoutTool } from "./ai/tools/create-checkout";
+import type { createUpdateCheckoutTool } from "./ai/tools/update-checkout";
+import type { createCompleteCheckoutTool } from "./ai/tools/complete-checkout";
 import type { Suggestion } from "./db/schema";
 import type { AppUsage } from "./usage";
 
@@ -22,12 +26,20 @@ type updateDocumentTool = InferUITool<ReturnType<typeof updateDocument>>;
 type requestSuggestionsTool = InferUITool<
   ReturnType<typeof requestSuggestions>
 >;
+type searchProductsTool = InferUITool<ReturnType<typeof createSearchProductsTool>>;
+type createCheckoutTool = InferUITool<ReturnType<typeof createCreateCheckoutTool>>;
+type updateCheckoutTool = InferUITool<ReturnType<typeof createUpdateCheckoutTool>>;
+type completeCheckoutTool = InferUITool<ReturnType<typeof createCompleteCheckoutTool>>;
 
 export type ChatTools = {
   getWeather: weatherTool;
   createDocument: createDocumentTool;
   updateDocument: updateDocumentTool;
   requestSuggestions: requestSuggestionsTool;
+  searchProducts: searchProductsTool;
+  createCheckout: createCheckoutTool;
+  updateCheckout: updateCheckoutTool;
+  completeCheckout: completeCheckoutTool;
 };
 
 export type CustomUIDataTypes = {

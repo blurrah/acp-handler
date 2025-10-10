@@ -23,6 +23,12 @@ import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
+import {
+  SearchProductsResult,
+  CreateCheckoutResult,
+  UpdateCheckoutResult,
+  CompleteCheckoutResult,
+} from "./shopping/shopping-tool-results";
 import { Weather } from "./weather";
 
 const PurePreviewMessage = ({
@@ -260,6 +266,78 @@ const PurePreviewMessage = ({
                             />
                           )
                         }
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
+            if (type === "tool-searchProducts") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-searchProducts" />
+                  <ToolContent>
+                    {state === "output-available" && part.output && (
+                      <ToolOutput
+                        errorText={undefined}
+                        output={<SearchProductsResult output={part.output} />}
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
+            if (type === "tool-createCheckout") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-createCheckout" />
+                  <ToolContent>
+                    {state === "output-available" && part.output && (
+                      <ToolOutput
+                        errorText={undefined}
+                        output={<CreateCheckoutResult output={part.output} />}
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
+            if (type === "tool-updateCheckout") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-updateCheckout" />
+                  <ToolContent>
+                    {state === "output-available" && part.output && (
+                      <ToolOutput
+                        errorText={undefined}
+                        output={<UpdateCheckoutResult output={part.output} />}
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
+            if (type === "tool-completeCheckout") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-completeCheckout" />
+                  <ToolContent>
+                    {state === "output-available" && part.output && (
+                      <ToolOutput
+                        errorText={undefined}
+                        output={<CompleteCheckoutResult output={part.output} />}
                       />
                     )}
                   </ToolContent>

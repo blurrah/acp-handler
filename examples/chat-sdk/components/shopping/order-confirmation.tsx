@@ -10,20 +10,18 @@ interface Money {
 }
 
 interface LineItem {
-  product_id: string;
+  id: string;
   quantity: number;
-  name: string;
-  description?: string;
+  title: string;
   image_url?: string;
   unit_price: Money;
-  total: Money;
 }
 
 interface Totals {
   subtotal: Money;
-  shipping: Money;
-  tax: Money;
-  total: Money;
+  shipping?: Money;
+  tax?: Money;
+  grand_total: Money;
 }
 
 interface OrderConfirmationProps {
@@ -71,7 +69,7 @@ export function OrderConfirmation({
               <div className="relative size-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                 <Image
                   src={item.image_url}
-                  alt={item.name}
+                  alt={item.title}
                   fill
                   className="object-cover"
                   sizes="64px"
@@ -81,12 +79,7 @@ export function OrderConfirmation({
 
             {/* Product Info */}
             <div className="flex-1">
-              <h3 className="font-semibold">{item.name}</h3>
-              {item.description && (
-                <p className="text-sm text-muted-foreground">
-                  {item.description}
-                </p>
-              )}
+              <h3 className="font-semibold">{item.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Quantity: {item.quantity}
               </p>
@@ -112,7 +105,7 @@ export function OrderConfirmation({
         {/* Paid Amount */}
         <div className="flex justify-between">
           <span className="text-muted-foreground">Paid {STORE_NAME}</span>
-          <span className="font-medium">{formatMoney(totals.total)}</span>
+          <span className="font-medium">{formatMoney(totals.grand_total)}</span>
         </div>
       </div>
 

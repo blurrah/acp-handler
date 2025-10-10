@@ -145,9 +145,9 @@ export function SearchProductsResult({ output }: { output: any }) {
     );
 
     const updatedItems = checkoutSession.line_items.map((item) =>
-      item.product_id === itemId
-        ? { id: item.product_id, quantity: newQuantity }
-        : { id: item.product_id, quantity: item.quantity }
+      item.id === itemId
+        ? { id: item.id, quantity: newQuantity }
+        : { id: item.id, quantity: item.quantity }
     );
 
     const response = await fetch(url.toString(), {
@@ -388,9 +388,9 @@ export function CreateCheckoutResult({ output }: { output: any }) {
 
     // Update with new quantities - replace entire items array
     const updatedItems = currentSession.line_items.map((item) =>
-      item.product_id === itemId
-        ? { id: item.product_id, quantity: newQuantity }
-        : { id: item.product_id, quantity: item.quantity }
+      item.id === itemId
+        ? { id: item.id, quantity: newQuantity }
+        : { id: item.id, quantity: item.quantity }
     );
 
     const response = await fetch(url.toString(), {
@@ -598,9 +598,9 @@ export function UpdateCheckoutResult({ output }: { output: any }) {
     );
 
     const updatedItems = currentSession.line_items.map((item) =>
-      item.product_id === itemId
-        ? { id: item.product_id, quantity: newQuantity }
-        : { id: item.product_id, quantity: item.quantity }
+      item.id === itemId
+        ? { id: item.id, quantity: newQuantity }
+        : { id: item.id, quantity: item.quantity }
     );
 
     const response = await fetch(url.toString(), {

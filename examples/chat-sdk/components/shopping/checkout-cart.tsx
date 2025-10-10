@@ -11,28 +11,24 @@ interface Money {
 }
 
 interface LineItem {
-  product_id: string;
+  id: string;
   quantity: number;
-  name: string;
-  description?: string;
+  title: string;
   image_url?: string;
   unit_price: Money;
-  total: Money;
 }
 
 interface Totals {
   subtotal: Money;
-  shipping: Money;
-  tax: Money;
-  total: Money;
+  shipping?: Money;
+  tax?: Money;
+  grand_total: Money;
 }
 
 interface FulfillmentOption {
   id: string;
-  type: string;
   label: string;
-  description: string;
-  amount: Money;
+  price: Money;
 }
 
 interface Address {
@@ -105,7 +101,7 @@ export function CheckoutCart({
   );
 
   const handleQuantityChange = async (itemId: string, delta: number) => {
-    const item = line_items.find((i) => i.product_id === itemId);
+    const item = line_items.find((i) => i.id === itemId);
     if (!item || !onUpdateQuantity) return;
 
     const newQuantity = item.quantity + delta;
@@ -175,7 +171,7 @@ export function CheckoutCart({
               <div className="relative size-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                 <Image
                   src={item.image_url}
-                  alt={item.name}
+                  alt={item.title}
                   fill
                   className="object-cover"
                   sizes="64px"
@@ -185,12 +181,7 @@ export function CheckoutCart({
 
             {/* Product Info */}
             <div className="flex-1">
-              <h3 className="font-semibold">{item.name}</h3>
-              {item.description && (
-                <p className="text-sm text-muted-foreground">
-                  {item.description}
-                </p>
-              )}
+              <h3 className="font-semibold">{item.title}</h3>
               <p className="mt-1 text-sm font-medium">
                 {formatMoney(item.unit_price)}
               </p>
@@ -200,10 +191,8 @@ export function CheckoutCart({
             <div className="flex items-center gap-2 rounded-full border">
               <button
                 type="button"
-                onClick={() => handleQuantityChange(item.product_id, -1)}
-                disabled={
-                  updatingItem === item.product_id || item.quantity <= 1
-                }
+                onClick={() => handleQuantityChange(item.id, -1)}
+                disabled={updatingItem === item.id || item.quantity <= 1}
                 className="flex size-8 items-center justify-center rounded-l-full transition-colors hover:bg-muted disabled:opacity-50"
               >
                 <Minus className="size-4" />
@@ -213,8 +202,8 @@ export function CheckoutCart({
               </span>
               <button
                 type="button"
-                onClick={() => handleQuantityChange(item.product_id, 1)}
-                disabled={updatingItem === item.product_id}
+                onClick={() => handleQuantityChange(item.id, 1)}
+                disabled={updatingItem === item.id}
                 className="flex size-8 items-center justify-center rounded-r-full transition-colors hover:bg-muted disabled:opacity-50"
               >
                 <Plus className="size-4" />
@@ -352,8 +341,7 @@ export function CheckoutCart({
             </option>
             {fulfillment_options.map((option) => (
               <option key={option.id} value={option.id}>
-                {option.label} - {formatMoney(option.amount)} (
-                {option.description})
+                {option.label} - {formatMoney(option.price)}
               </option>
             ))}
           </select>
@@ -364,20 +352,24 @@ export function CheckoutCart({
       <div className="mb-6 space-y-2 border-t pt-4">
         <div className="flex justify-between text-lg font-semibold">
           <span>Total due today</span>
-          <span>{formatMoney(totals.total)}</span>
+          <span>{formatMoney(totals.grand_total)}</span>
         </div>
         <div className="flex justify-between text-sm text-muted-foreground">
           <span>Subtotal</span>
           <span>{formatMoney(totals.subtotal)}</span>
         </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Shipping</span>
-          <span>{formatMoney(totals.shipping)}</span>
-        </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Tax</span>
-          <span>{formatMoney(totals.tax)}</span>
-        </div>
+        {totals.shipping && (
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Shipping</span>
+            <span>{formatMoney(totals.shipping)}</span>
+          </div>
+        )}
+        {totals.tax && (
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Tax</span>
+            <span>{formatMoney(totals.tax)}</span>
+          </div>
+        )}
       </div>
 
       {/* Pay Button */}

@@ -93,6 +93,7 @@ const CustomAttributeSchema = z.object({
 
 /**
  * Full product feed item schema based on OpenAI Commerce spec
+ * @see https://developers.openai.com/commerce/specs/feed
  */
 export const ProductFeedItemSchema = z.object({
 	// OpenAI Flags
@@ -114,36 +115,92 @@ export const ProductFeedItemSchema = z.object({
 	gtin: z.string().optional(), // Global Trade Item Number (UPC, EAN, ISBN)
 	sku: z.string().optional(),
 	condition: ConditionSchema.optional(),
+	product_category: z.string().optional(),
+
+	// Physical Properties
+	material: z.string().optional(),
+	pattern: z.string().optional(),
+	color: z.string().optional(),
+	size: z.string().optional(),
+	age_group: AgeGroupSchema.optional(),
+	gender: GenderSchema.optional(),
+	dimensions: z.string().optional(), // Freeform dimensions string
+	length: z
+		.object({
+			value: z.number().positive(),
+			unit: z.enum(["in", "cm", "m", "ft"]),
+		})
+		.optional(),
+	width: z
+		.object({
+			value: z.number().positive(),
+			unit: z.enum(["in", "cm", "m", "ft"]),
+		})
+		.optional(),
+	height: z
+		.object({
+			value: z.number().positive(),
+			unit: z.enum(["in", "cm", "m", "ft"]),
+		})
+		.optional(),
+	weight: z
+		.object({
+			value: z.number().positive(),
+			unit: z.enum(["lb", "oz", "kg", "g"]),
+		})
+		.optional(),
 
 	// Media
 	image_url: z.string().url().optional(),
 	additional_image_urls: z.array(z.string().url()).optional(),
 	video_urls: z.array(z.string().url()).optional(),
+	model_3d_url: z.string().url().optional(),
 
 	// Price & Promotions
 	compare_at_price: MoneySchema.optional(),
 	sale_price: MoneySchema.optional(),
 	sale_price_effective_start: z.string().datetime().optional(),
 	sale_price_effective_end: z.string().datetime().optional(),
+	applicable_taxes_fees: MoneySchema.optional(),
+	unit_pricing_measure: z
+		.object({
+			value: z.number().positive(),
+			unit: z.string(),
+		})
+		.optional(),
+	unit_pricing_base_measure: z
+		.object({
+			value: z.number().positive(),
+			unit: z.string(),
+		})
+		.optional(),
+	pricing_trend: z.string().optional(),
 
-	// Variants
+	// Availability & Inventory
+	availability_date: z.string().datetime().optional(),
+	expiration_date: z.string().datetime().optional(),
+	pickup_method: z.enum(["buy_online_pickup_in_store", "curbside", "in_store"]).optional(),
+	pickup_sla: z.string().optional(), // e.g., "1 hour", "same day"
+
+	// Variants & Item Groups
 	variants: z.array(VariantSchema).optional(),
-	color: z.string().optional(),
-	size: z.string().optional(),
-	material: z.string().optional(),
-	pattern: z.string().optional(),
-	age_group: AgeGroupSchema.optional(),
-	gender: GenderSchema.optional(),
+	item_group_id: z.string().optional(),
+	item_group_title: z.string().optional(),
 
 	// Fulfillment
 	shipping_weight: ShippingWeightSchema.optional(),
 	shipping_dimensions: ShippingDimensionsSchema.optional(),
 	shipping_label: z.string().optional(),
 	ships_from_country: z.string().length(2).optional(), // ISO 3166-1 alpha-2
+	delivery_estimate: z.string().optional(), // e.g., "2-5 business days"
+	shipping_cost: MoneySchema.optional(),
 
 	// Merchant Info
 	merchant_id: z.string().optional(),
-	merchant_name: z.string().optional(),
+	merchant_name: z.string().max(70).optional(),
+	merchant_url: z.string().url().optional(),
+	merchant_privacy_policy_url: z.string().url().optional(),
+	merchant_terms_of_service_url: z.string().url().optional(),
 
 	// Returns
 	return_policy_url: z.string().url().optional(),
@@ -155,11 +212,15 @@ export const ProductFeedItemSchema = z.object({
 	average_rating: z.number().min(0).max(5).optional(),
 	number_of_ratings: z.number().int().nonnegative().optional(),
 	number_of_reviews: z.number().int().nonnegative().optional(),
+	popularity_score: z.number().min(0).max(5).optional(),
+	return_rate: z.number().min(0).max(100).optional(), // Percentage
 
-	// Compliance
+	// Compliance & Safety
 	adult_only: z.boolean().optional(),
 	requires_prescription: z.boolean().optional(),
 	multipack: z.number().int().positive().optional(),
+	age_restriction: z.number().int().positive().optional(), // Minimum age
+	warning: z.string().optional(), // Product disclaimers
 
 	// Category & Classification
 	product_type: z.string().optional(),
@@ -170,10 +231,34 @@ export const ProductFeedItemSchema = z.object({
 
 	// Related Products
 	related_product_ids: z.array(z.string()).optional(),
+	relationship_type: z
+		.enum(["often_bought_with", "similar_to", "accessories_for", "alternative_to"])
+		.optional(),
+
+	// Reviews & Q&A
+	product_review_count: z.number().int().nonnegative().optional(),
+	product_review_rating: z.number().min(0).max(5).optional(),
+	qa_content: z.string().optional(), // FAQ content
 
 	// Geo Tagging
 	included_destinations: z.array(z.string()).optional(),
 	excluded_destinations: z.array(z.string()).optional(),
+	geo_price: z
+		.array(
+			z.object({
+				region: z.string(),
+				price: MoneySchema,
+			}),
+		)
+		.optional(),
+	geo_availability: z
+		.array(
+			z.object({
+				region: z.string(),
+				availability: AvailabilitySchema,
+			}),
+		)
+		.optional(),
 });
 
 /**

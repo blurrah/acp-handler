@@ -20,6 +20,7 @@
 		"agentic-commerce",
 		"commerce",
 		"checkout",
+		"product-feed",
 		"ai",
 		"chatgpt",
 		"openai",
@@ -39,6 +40,14 @@
 		"./next": {
 			"types": "./dist/next/index.d.ts",
 			"import": "./dist/next/index.js"
+		},
+		"./feed": {
+			"types": "./dist/feed/index.d.ts",
+			"import": "./dist/feed/index.js"
+		},
+		"./feed/next": {
+			"types": "./dist/feed/next/index.d.ts",
+			"import": "./dist/feed/next/index.js"
 		},
 		"./test": {
 			"types": "./dist/test/index.d.ts",

@@ -111,7 +111,7 @@ export function createHandlers(config: HandlerConfig) {
 		updateCheckout: async (input: any): Promise<unknown> => {
 			const { session_id, ...body } = input;
 			return request(`/api/checkout/${session_id}`, {
-				method: "PATCH",
+				method: "POST",
 				body: JSON.stringify(body),
 			});
 		},

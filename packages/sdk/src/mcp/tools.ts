@@ -24,7 +24,6 @@ export const searchProducts: MCPToolDefinition = {
 			.int()
 			.positive()
 			.default(10)
-			.optional()
 			.describe("Maximum number of results to return"),
 	}),
 };
@@ -167,9 +166,7 @@ export const completeCheckout: MCPToolDefinition = {
 		}),
 		payment: z
 			.object({
-				method: z
-					.string()
-					.describe("Payment method (e.g., 'card', 'paypal')"),
+				method: z.string().describe("Payment method (e.g., 'card', 'paypal')"),
 				token: z
 					.string()
 					.optional()

@@ -1,11 +1,11 @@
-export * from "./crypto";
 export * from "./errors";
 export * from "./fsm";
 export * from "./handlers";
-export * from "./headers";
-export * from "./http";
+export * from "./lib/crypto";
+export * from "./lib/headers";
+export * from "./lib/http";
+export * from "./lib/signature";
 export * from "./schema";
-export * from "./signature";
 export * from "./storage";
 export { createStoreWithRedis } from "./storage/redis";
 export * from "./types";

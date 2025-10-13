@@ -1,6 +1,6 @@
 // core/schema.ts
 import { z } from "zod";
-import { err } from "./http";
+import { err } from "./lib/http";
 
 export const MoneySchema = z.object({
 	amount: z.number(),

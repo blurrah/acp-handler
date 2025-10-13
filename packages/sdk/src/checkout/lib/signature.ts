@@ -18,21 +18,6 @@ export interface SignatureConfig {
 
 /**
  * Verifies the HMAC signature of an incoming request
- *
- * This prevents:
- * - Unauthorized requests (only OpenAI has the secret)
- * - Replay attacks (timestamp must be recent)
- * - Tampering (signature covers body + timestamp)
- *
- * @example
- * ```ts
- * const isValid = await verifySignature(req, {
- *   secret: process.env.OPENAI_WEBHOOK_SECRET
- * });
- * if (!isValid) {
- *   return new Response('Unauthorized', { status: 401 });
- * }
- * ```
  */
 export async function verifySignature(
 	req: Request,
@@ -78,10 +63,7 @@ export async function verifySignature(
 
 /**
  * Computes HMAC signature for a payload
- *
  * Format: HMAC-SHA256(timestamp.body, secret)
- *
- * @internal
  */
 export function computeSignature(
 	body: string,
@@ -94,20 +76,6 @@ export function computeSignature(
 
 /**
  * Middleware helper for signature verification
- *
- * @example
- * ```ts
- * const handlers = createHandlers(
- *   { products, payments, webhooks },
- *   {
- *     store,
- *     signature: {
- *       secret: process.env.OPENAI_WEBHOOK_SECRET,
- *       toleranceSec: 300
- *     }
- *   }
- * );
- * ```
  */
 export function createSignatureVerifier(config: SignatureConfig) {
 	return {

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { z } from "zod";
-import { err, parseJSON } from "../checkout/http";
+import { err, parseJSON } from "../checkout/lib/http";
 import {
 	CompleteCheckoutSessionSchema as DefaultCompleteCheckoutSessionSchema,
 	CreateCheckoutSessionSchema as DefaultCreateCheckoutSessionSchema,

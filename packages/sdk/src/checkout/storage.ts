@@ -43,8 +43,3 @@ export function createRedisSessionStore(kv: KV, ns = "acp"): SessionStore {
 		},
 	};
 }
-
-/**
- * @deprecated Use createRedisSessionStore instead
- */
-export const sessionStore = createRedisSessionStore;

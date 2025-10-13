@@ -1,14 +1,14 @@
 import type { Tracer } from "@opentelemetry/api";
 import { ACPError, isACPError } from "./errors.ts";
 import { canTransition } from "./fsm.ts";
-import { HEADERS, parseHeaders } from "./headers.ts";
-import { err, ok } from "./http.ts";
 import { withIdempotency } from "./idempotency.ts";
-import type { SignatureConfig } from "./signature.ts";
-import { verifySignature } from "./signature.ts";
+import { HEADERS, parseHeaders } from "./lib/headers.ts";
+import { err, ok } from "./lib/http.ts";
+import type { SignatureConfig } from "./lib/signature.ts";
+import { verifySignature } from "./lib/signature.ts";
+import { traced } from "./lib/tracing.ts";
 import type { KV, SessionStore } from "./storage.ts";
 import { createRedisSessionStore } from "./storage.ts";
-import { traced } from "./tracing.ts";
 import type {
 	CheckoutSession,
 	CompleteCheckoutSessionRequest,

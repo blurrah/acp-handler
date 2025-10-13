@@ -13,15 +13,15 @@
  * for the user to complete payment on your site (which can be loaded in the ChatGPT
  * iframe if desired).
  *
- * @example Basic usage
+ * @example Basic usage (default checkout URL)
  * ```typescript
  * import { McpServer } from 'mcp-handler';
  * import { tools, createHandlers } from 'acp-handler/mcp';
  *
  * const server = new McpServer({ name: 'my-store' });
  * const handlers = createHandlers({
- *   baseUrl: 'https://mystore.com',
- *   checkoutUrlPattern: 'https://mystore.com/checkout/{session_id}'
+ *   baseUrl: 'https://mystore.com'
+ *   // Defaults to: https://mystore.com/checkout/:sessionId
  * });
  *
  * // Register all tools
@@ -32,7 +32,7 @@
  * server.start();
  * ```
  *
- * @example With custom checkout URL function
+ * @example With custom checkout URL
  * ```typescript
  * import { McpServer } from 'mcp-handler';
  * import { tools, createHandlers } from 'acp-handler/mcp';
@@ -41,10 +41,7 @@
  * const handlers = createHandlers({
  *   baseUrl: 'https://mystore.com',
  *   headers: { 'Authorization': 'Bearer secret' },
- *   getCheckoutUrl: (sessionId) => {
- *     // Custom logic for checkout URL
- *     return `https://mystore.com/buy/${sessionId}?source=chatgpt`;
- *   }
+ *   getCheckoutUrl: (sessionId) => `https://mystore.com/buy/${sessionId}?source=chatgpt`
  * });
  *
  * // Register tools
@@ -53,7 +50,7 @@
  * server.registerTool('complete_checkout', tools.completeCheckout, handlers.completeCheckout);
  * ```
  *
- * @example With customization
+ * @example With custom handler logic
  * ```typescript
  * import { McpServer } from 'mcp-handler';
  * import { tools, createHandlers } from 'acp-handler/mcp';
@@ -61,7 +58,7 @@
  * const server = new McpServer({ name: 'my-store' });
  * const handlers = createHandlers({
  *   baseUrl: 'https://mystore.com',
- *   checkoutUrlPattern: 'https://mystore.com/checkout/{session_id}'
+ *   getCheckoutUrl: (sessionId) => `https://mystore.com/checkout/${sessionId}`
  * });
  *
  * // Customize tool definitions
@@ -70,22 +67,17 @@
  *   {
  *     ...tools.searchProducts,
  *     description: 'Search our awesome product catalog!',
- *     _meta: {
- *       'openai/outputTemplate': 'ui://widget/custom-products.html'
- *     }
  *   },
  *   handlers.searchProducts
  * );
  *
- * // Or use custom handler logic
+ * // Or wrap handlers with custom logic
  * server.registerTool(
  *   'create_checkout',
  *   tools.createCheckout,
  *   async (input) => {
- *     // Custom logic before calling API
  *     console.log('Creating checkout:', input);
  *     const result = await handlers.createCheckout(input);
- *     // Custom logic after
  *     return result;
  *   }
  * );

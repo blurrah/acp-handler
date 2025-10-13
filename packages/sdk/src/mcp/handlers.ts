@@ -16,6 +16,28 @@ export interface HandlerConfig {
 	 * Optional fetch implementation (useful for testing or custom logic)
 	 */
 	fetch?: typeof fetch;
+
+	/**
+	 * Checkout URL pattern or function for payment fallback in MCP context.
+	 * Used when completeCheckout is called without a payment token.
+	 *
+	 * @example String pattern
+	 * ```typescript
+	 * checkoutUrlPattern: 'https://mystore.com/checkout/{session_id}'
+	 * ```
+	 *
+	 * @example Function
+	 * ```typescript
+	 * getCheckoutUrl: (sessionId) => `https://mystore.com/checkout/${sessionId}`
+	 * ```
+	 */
+	checkoutUrlPattern?: string;
+
+	/**
+	 * Function to generate checkout URL for a session.
+	 * Takes precedence over checkoutUrlPattern if both are provided.
+	 */
+	getCheckoutUrl?: (sessionId: string) => string;
 }
 
 /**
@@ -117,13 +139,43 @@ export function createHandlers(config: HandlerConfig) {
 		},
 
 		/**
-		 * Complete a checkout session and process payment
+		 * Complete a checkout session and process payment.
+		 * In MCP context (no payment token), returns checkout URL for user to complete payment.
+		 * In ACP context (with payment token), processes payment directly.
 		 */
 		completeCheckout: async (input: any): Promise<unknown> => {
-			const { session_id, ...body } = input;
+			const { session_id, customer, payment } = input;
+
+			// MCP context: no payment token provided
+			// Return checkout URL for user to complete payment on merchant site
+			if (!payment?.token) {
+				let checkoutUrl: string;
+
+				if (config.getCheckoutUrl) {
+					checkoutUrl = config.getCheckoutUrl(session_id);
+				} else if (config.checkoutUrlPattern) {
+					checkoutUrl = config.checkoutUrlPattern.replace(
+						"{session_id}",
+						session_id,
+					);
+				} else {
+					// Default: base URL + /checkout/:id
+					checkoutUrl = `${config.baseUrl}/checkout/${session_id}`;
+				}
+
+				return {
+					checkout_url: checkoutUrl,
+					session_id,
+					status: "pending_payment",
+					message: "Complete your purchase at the checkout link",
+				};
+			}
+
+			// ACP context: payment token provided
+			// Process payment through ACP complete endpoint
 			return request(`/api/checkout/${session_id}/complete`, {
 				method: "POST",
-				body: JSON.stringify(body),
+				body: JSON.stringify({ customer, payment }),
 			});
 		},
 

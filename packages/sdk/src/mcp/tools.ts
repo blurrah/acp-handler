@@ -151,23 +151,36 @@ export const updateCheckout: MCPToolDefinition = {
  * Complete a checkout session and process payment
  *
  * Maps to: POST /api/checkout/:id/complete
+ *
+ * Behavior depends on payment token availability:
+ * - With payment token (ACP): Processes payment directly through the complete endpoint
+ * - Without payment token (MCP): Returns checkout_url for user to complete payment on merchant site
  */
 export const completeCheckout: MCPToolDefinition = {
 	description:
-		"Complete the checkout process and process payment. Customer and payment information must be provided.",
+		"Complete the checkout process. In MCP context (without payment token), returns a checkout URL for the user to complete payment. In ACP context (with delegated payment token), processes payment directly.",
 	inputSchema: z.object({
 		session_id: z.string().describe("Checkout session ID to complete"),
 		customer: z.object({
 			email: z.string().email().describe("Customer email address"),
 			name: z.string().describe("Customer full name"),
 		}),
-		payment: z.object({
-			method: z.string().describe("Payment method (e.g., 'card', 'paypal')"),
-			token: z
-				.string()
-				.optional()
-				.describe("Payment token from payment processor"),
-		}),
+		payment: z
+			.object({
+				method: z
+					.string()
+					.describe("Payment method (e.g., 'card', 'paypal')"),
+				token: z
+					.string()
+					.optional()
+					.describe(
+						"Payment token from payment processor (delegated token for ACP)",
+					),
+			})
+			.optional()
+			.describe(
+				"Payment information (optional for MCP, required for ACP payment processing)",
+			),
 	}),
 };
 

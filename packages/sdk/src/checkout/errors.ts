@@ -11,33 +11,30 @@ export type SpecError = {
 	};
 };
 
-export function err(
-	code: string,
-	message: string,
-	param?: string,
-	type: SpecError["error"]["type"] = "invalid_request_error",
-	status = 400,
-) {
-	return new Response(
-		JSON.stringify({
-			error: { type, code, message, ...(param ? { param } : {}) },
-		}),
-		{
-			status,
-			headers: { "content-type": "application/json" },
-		},
-	);
+export class ACPError extends Error {
+	readonly code: string;
+	readonly param?: string;
+	readonly type: SpecError["error"]["type"];
+	readonly status: number;
+
+	constructor(options: {
+		code: string;
+		message: string;
+		param?: string;
+		type?: SpecError["error"]["type"];
+		status?: number;
+	}) {
+		super(options.message);
+		this.name = "ACPError";
+		this.code = options.code;
+		this.param = options.param;
+		this.type = options.type ?? "invalid_request_error";
+		this.status = options.status ?? 400;
+	}
 }
 
-export function ok<T>(
-	data: T,
-	{
-		status = 200,
-		echo,
-	}: { status?: number; echo?: Record<string, string | undefined> } = {},
-) {
-	const headers = new Headers({ "content-type": "application/json" });
-	if (echo)
-		for (const [k, v] of Object.entries(echo)) if (v) headers.set(k, String(v));
-	return new Response(JSON.stringify(data), { status, headers });
+export function isACPError(e: unknown): e is ACPError {
+	return e instanceof ACPError;
 }
+
+// Response helpers moved to http.ts

@@ -1,7 +1,8 @@
 import type { Tracer } from "@opentelemetry/api";
-import { err, ok } from "./errors.ts";
+import { ACPError, isACPError } from "./errors.ts";
 import { canTransition } from "./fsm.ts";
 import { HEADERS, parseHeaders } from "./headers.ts";
+import { err, ok } from "./http.ts";
 import { withIdempotency } from "./idempotency.ts";
 import type { SignatureConfig } from "./signature.ts";
 import { verifySignature } from "./signature.ts";
@@ -47,7 +48,7 @@ export type Webhooks = {
 	// Merchant → Agent platform webhook emitter (signed)
 	orderUpdated(evt: {
 		checkout_session_id: string;
-		status: string;
+		status: OrderStatus;
 		order?: Order;
 	}): Promise<void>;
 };
@@ -82,13 +83,12 @@ export function createHandlers(
 		const isValid = await verifySignature(cloned, signature);
 
 		if (!isValid) {
-			return err(
-				"invalid_signature",
-				"Request signature verification failed",
-				undefined,
-				"authentication_error",
-				401,
-			);
+			return err({
+				code: "invalid_signature",
+				message: "Request signature verification failed",
+				type: "authentication_error",
+				status: 401,
+			});
 		}
 
 		return null;
@@ -178,14 +178,13 @@ export function createHandlers(
 					);
 
 					if (!s)
-						throw new Error(
-							JSON.stringify({
-								code: "session_not_found",
-								message: `Session "${id}" not found`,
-								param: "checkout_session_id",
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "session_not_found",
+							message: `Session "${id}" not found`,
+							param: "checkout_session_id",
+							type: "invalid_request_error",
+							status: 404,
+						});
 
 					// Merge updates
 					const items =
@@ -241,15 +240,22 @@ export function createHandlers(
 							[HEADERS.REQ_ID]: H.requestId,
 						},
 					});
-				} catch (e: any) {
-					const parsed = JSON.parse(e.message);
-					return err(
-						parsed.code,
-						parsed.message,
-						parsed.param,
-						parsed.type,
-						404,
-					);
+				} catch (e: unknown) {
+					if (isACPError(e)) {
+						return err({
+							code: e.code,
+							message: e.message,
+							param: e.param,
+							type: e.type,
+							status: e.status,
+						});
+					}
+					return err({
+						code: "internal_error",
+						message: "Internal server error",
+						type: "api_error",
+						status: 500,
+					});
 				}
 			}),
 
@@ -277,24 +283,22 @@ export function createHandlers(
 					);
 
 					if (!s)
-						throw new Error(
-							JSON.stringify({
-								code: "session_not_found",
-								message: `Session "${id}" not found`,
-								param: "checkout_session_id",
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "session_not_found",
+							message: `Session "${id}" not found`,
+							param: "checkout_session_id",
+							type: "invalid_request_error",
+							status: 404,
+						});
 
 					if (s.status !== "ready_for_payment")
-						throw new Error(
-							JSON.stringify({
-								code: "invalid_state",
-								message: `Cannot complete from "${s.status}"`,
-								param: "status",
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "invalid_state",
+							message: `Cannot complete from "${s.status}"`,
+							param: "status",
+							type: "invalid_request_error",
+							status: 400,
+						});
 
 					// authorize & capture
 					const auth = await traced(
@@ -309,13 +313,12 @@ export function createHandlers(
 					);
 
 					if (!auth.ok)
-						throw new Error(
-							JSON.stringify({
-								code: "payment_authorization_failed",
-								message: auth.reason,
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "payment_authorization_failed",
+							message: auth.reason,
+							type: "invalid_request_error",
+							status: 400,
+						});
 
 					span?.setAttribute("payment_intent_id", auth.intent_id);
 
@@ -327,24 +330,22 @@ export function createHandlers(
 					);
 
 					if (!cap.ok)
-						throw new Error(
-							JSON.stringify({
-								code: "payment_capture_failed",
-								message: cap.reason,
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "payment_capture_failed",
+							message: cap.reason,
+							type: "invalid_request_error",
+							status: 400,
+						});
 
 					const can = canTransition(s.status, "completed");
 					if (can !== true)
-						throw new Error(
-							JSON.stringify({
-								code: "invalid_state",
-								message: can.error,
-								param: "status",
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "invalid_state",
+							message: can.error,
+							param: "status",
+							type: "invalid_request_error",
+							status: 400,
+						});
 
 					const completed: CheckoutSession = {
 						...s,
@@ -381,9 +382,22 @@ export function createHandlers(
 							[HEADERS.REQ_ID]: H.requestId,
 						},
 					});
-				} catch (e: any) {
-					const parsed = JSON.parse(e.message);
-					return err(parsed.code, parsed.message, parsed.param, parsed.type);
+				} catch (e: unknown) {
+					if (isACPError(e)) {
+						return err({
+							code: e.code,
+							message: e.message,
+							param: e.param,
+							type: e.type,
+							status: e.status,
+						});
+					}
+					return err({
+						code: "internal_error",
+						message: "Internal server error",
+						type: "api_error",
+						status: 500,
+					});
 				}
 			}),
 
@@ -407,25 +421,23 @@ export function createHandlers(
 					);
 
 					if (!s)
-						throw new Error(
-							JSON.stringify({
-								code: "session_not_found",
-								message: `Session "${id}" not found`,
-								param: "checkout_session_id",
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "session_not_found",
+							message: `Session "${id}" not found`,
+							param: "checkout_session_id",
+							type: "invalid_request_error",
+							status: 404,
+						});
 
 					const can = canTransition(s.status, "canceled");
 					if (can !== true)
-						throw new Error(
-							JSON.stringify({
-								code: "invalid_state",
-								message: can.error,
-								param: "status",
-								type: "invalid_request_error",
-							}),
-						);
+						throw new ACPError({
+							code: "invalid_state",
+							message: can.error,
+							param: "status",
+							type: "invalid_request_error",
+							status: 400,
+						});
 
 					const next: CheckoutSession = {
 						...s,
@@ -456,15 +468,22 @@ export function createHandlers(
 							[HEADERS.REQ_ID]: H.requestId,
 						},
 					});
-				} catch (e: any) {
-					const parsed = JSON.parse(e.message);
-					return err(
-						parsed.code,
-						parsed.message,
-						parsed.param,
-						parsed.type,
-						404,
-					);
+				} catch (e: unknown) {
+					if (isACPError(e)) {
+						return err({
+							code: e.code,
+							message: e.message,
+							param: e.param,
+							type: e.type,
+							status: e.status,
+						});
+					}
+					return err({
+						code: "internal_error",
+						message: "Internal server error",
+						type: "api_error",
+						status: 500,
+					});
 				}
 			}),
 
@@ -482,13 +501,13 @@ export function createHandlers(
 				});
 
 				if (!s)
-					return err(
-						"session_not_found",
-						`Session "${id}" not found`,
-						"checkout_session_id",
-						"invalid_request_error",
-						404,
-					);
+					return err({
+						code: "session_not_found",
+						message: `Session "${id}" not found`,
+						param: "checkout_session_id",
+						type: "invalid_request_error",
+						status: 404,
+					});
 
 				span?.setAttribute("session_status", s.status);
 

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { z } from "zod";
-import { parseJSON, specError } from "../checkout/http";
+import { err, parseJSON } from "../checkout/http";
 import {
 	CompleteCheckoutSessionSchema as DefaultCompleteCheckoutSessionSchema,
 	CreateCheckoutSessionSchema as DefaultCreateCheckoutSessionSchema,
@@ -42,8 +42,13 @@ export function createNextCatchAll<C, U, X>(
 		{ params }: { params: Promise<{ segments?: string[] }> },
 	) {
 		const seg = (await params).segments ?? [];
-		if (seg.length === 1) return H.get(req as unknown as Request, seg[0]!);
-		return specError("not_found", "Route not found", undefined, 404);
+		if (seg.length === 1) return H.get(req as unknown as Request, seg[0]);
+		return err({
+			code: "not_found",
+			message: "Route not found",
+			type: "invalid_request_error",
+			status: 404,
+		});
 	}
 
 	async function POST(
@@ -76,15 +81,20 @@ export function createNextCatchAll<C, U, X>(
 			if (!parsed.ok) return parsed.res;
 			const v = validateBody<X>(Schemas.complete, parsed.body);
 			if (!v.ok) return v.res;
-			return H.complete(req as unknown as Request, seg[0]!, v.data);
+			return H.complete(req as unknown as Request, seg[0], v.data);
 		}
 
 		// POST /checkout_sessions/:id/cancel
 		if (seg.length === 2 && seg[1] === "cancel") {
-			return H.cancel(req as unknown as Request, seg[0]!);
+			return H.cancel(req as unknown as Request, seg[0]);
 		}
 
-		return specError("not_found", "Route not found", undefined, 404);
+		return err({
+			code: "not_found",
+			message: "Route not found",
+			type: "invalid_request_error",
+			status: 404,
+		});
 	}
 
 	return { GET, POST };

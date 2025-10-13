@@ -1,6 +1,6 @@
 // core/schema.ts
 import { z } from "zod";
-import { specError } from "./http";
+import { err } from "./http";
 
 export const MoneySchema = z.object({
 	amount: z.number(),
@@ -58,7 +58,11 @@ export function validateBody<T>(schema: z.ZodTypeAny, body: unknown) {
 		const i = v.error.issues[0];
 		return {
 			ok: false as const,
-			res: specError("validation_error", i.message, i.path.join(".")),
+			res: err({
+				code: "validation_error",
+				message: i.message,
+				param: i.path.join("."),
+			}),
 		};
 	}
 	return { ok: true as const, data: v.data as T };

@@ -5,20 +5,45 @@ export function json(data: unknown, status = 200, headers?: HeadersInit) {
 	});
 }
 
-export function specError(
-	code: string,
-	message: string,
-	param?: string,
-	status = 400,
-	type:
+export function ok<T>(
+	data: T,
+	{
+		status = 200,
+		echo,
+	}: { status?: number; echo?: Record<string, string | undefined> } = {},
+) {
+	const headers = new Headers({ "content-type": "application/json" });
+	if (echo)
+		for (const [k, v] of Object.entries(echo)) if (v) headers.set(k, String(v));
+	return new Response(JSON.stringify(data), { status, headers });
+}
+
+export function err(options: {
+	code: string;
+	message: string;
+	param?: string;
+	type?:
 		| "invalid_request_error"
 		| "authentication_error"
 		| "rate_limit_error"
-		| "api_error" = "invalid_request_error",
-) {
-	return json(
-		{ error: { type, code, message, ...(param ? { param } : {}) } },
-		status,
+		| "api_error";
+	status?: number;
+}) {
+	const {
+		code,
+		message,
+		param,
+		type = "invalid_request_error",
+		status = 400,
+	} = options;
+	return new Response(
+		JSON.stringify({
+			error: { type, code, message, ...(param ? { param } : {}) },
+		}),
+		{
+			status,
+			headers: { "content-type": "application/json" },
+		},
 	);
 }
 
@@ -28,7 +53,7 @@ export async function parseJSON<T>(req: Request) {
 	} catch {
 		return {
 			ok: false as const,
-			res: specError("invalid_json", "Invalid JSON body"),
+			res: err({ code: "invalid_json", message: "Invalid JSON body" }),
 		};
 	}
 }

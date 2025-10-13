@@ -1,4 +1,4 @@
-import { hmacSign } from "../crypto.ts";
+import { hmacSign } from "../lib/crypto.ts";
 import type { OrderEventData, WebhookEvent } from "../types.ts";
 
 export type OutboundConfig = {

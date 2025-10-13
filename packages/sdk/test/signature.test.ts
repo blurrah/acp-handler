@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { computeSignature, verifySignature } from "../src/checkout/signature";
+import {
+	computeSignature,
+	verifySignature,
+} from "../src/checkout/lib/signature";
 
 describe("Signature Verification", () => {
 	const secret = "test_secret_key_12345";

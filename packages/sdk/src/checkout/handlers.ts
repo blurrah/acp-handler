@@ -202,6 +202,22 @@ export function createHandlers(
 						{ items_count: items.length.toString() },
 					);
 
+					// Determine next status based on quote readiness and FSM rules
+					// FSM rules: ready_for_payment can only go to completed/canceled, not back to not_ready
+					let nextStatus = s.status;
+					if (quote.ready && s.status === "not_ready_for_payment") {
+						// Can upgrade from not_ready to ready
+						nextStatus = "ready_for_payment";
+					} else if (
+						!quote.ready &&
+						s.status === "not_ready_for_payment"
+					) {
+						// Stay in not_ready state
+						nextStatus = "not_ready_for_payment";
+					}
+					// Note: If ready_for_payment and quote becomes not ready, we keep ready_for_payment
+					// since the FSM doesn't allow downgrading. The messages should indicate issues.
+
 					const next: CheckoutSession = {
 						...s,
 						items: quote.items,
@@ -209,11 +225,7 @@ export function createHandlers(
 						fulfillment: quote.fulfillment,
 						customer: body.customer ?? s.customer,
 						messages: quote.messages,
-						status: quote.ready
-							? s.status === "not_ready_for_payment"
-								? "ready_for_payment"
-								: s.status
-							: "not_ready_for_payment",
+						status: nextStatus,
 						updated_at: new Date().toISOString(),
 					};
 

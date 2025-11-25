@@ -141,18 +141,39 @@ export function createHandlers(
 					return session;
 				};
 
-				const { reused, value } = await withIdempotency(
-					idek,
-					idempotency,
-					compute,
-				);
+				try {
+					const { reused, value } = await withIdempotency(
+						idek,
+						idempotency,
+						compute,
+					);
 
-				span?.setAttribute("idempotency_reused", reused.toString());
+					span?.setAttribute("idempotency_reused", reused.toString());
 
-				return ok<CheckoutSession>(value, {
-					status: reused ? 200 : 201,
-					echo: { [HEADERS.IDEMPOTENCY]: idek, [HEADERS.REQ_ID]: H.requestId },
-				});
+					return ok<CheckoutSession>(value, {
+						status: reused ? 200 : 201,
+						echo: {
+							[HEADERS.IDEMPOTENCY]: idek,
+							[HEADERS.REQ_ID]: H.requestId,
+						},
+					});
+				} catch (e: unknown) {
+					if (isACPError(e)) {
+						return err({
+							code: e.code,
+							message: e.message,
+							param: e.param,
+							type: e.type,
+							status: e.status,
+						});
+					}
+					return err({
+						code: "internal_error",
+						message: "Internal server error",
+						type: "api_error",
+						status: 500,
+					});
+				}
 			}),
 
 		// POST /checkout_sessions/:id

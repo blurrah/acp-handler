@@ -22,39 +22,31 @@ NEXT_PUBLIC_URL=https://yourstore.com
 **Example implementation:**
 
 ```typescript
-import { createHandlers } from "@/sdk/core/handlers";
-import { createOutboundWebhook } from "@/sdk/webhooks/outbound";
+import { createOutboundWebhook } from "acp-handler";
 import { after } from "next/server";
 
 const webhook = createOutboundWebhook({
   webhookUrl: process.env.OPENAI_WEBHOOK_URL!,
   secret: process.env.OPENAI_WEBHOOK_SECRET!,
   merchantName: process.env.MERCHANT_NAME,
+  timeoutMs: 30_000, // Optional: request timeout (default: 30s)
 });
 
-const outbound = {
-  orderUpdated: async (evt) => {
-    // Send webhook after response (non-blocking)
-    after(async () => {
-      try {
-        await webhook.orderUpdated({
-          checkout_session_id: evt.checkout_session_id,
-          status: evt.status,
-          order: evt.order,
-          permalink_url: evt.order
-            ? `${process.env.NEXT_PUBLIC_URL}/orders/${evt.order.id}`
-            : undefined,
-        });
-        console.log(`✓ Webhook sent for ${evt.checkout_session_id}`);
-      } catch (error) {
-        console.error("✗ Webhook failed:", error);
-        // TODO: Log to monitoring service for retry
-      }
+// Send webhook after response (non-blocking)
+after(async () => {
+  try {
+    await webhook.orderUpdated({
+      type: "order",
+      checkout_session_id: "session_123",
+      permalink_url: `${process.env.NEXT_PUBLIC_URL}/orders/order_123`,
+      status: "shipped",
     });
-  },
-};
-
-const handlers = createHandlers({ catalog, psp, store, outbound });
+    console.log("✓ Webhook sent");
+  } catch (error) {
+    console.error("✗ Webhook failed:", error);
+    // TODO: Log to monitoring service for retry
+  }
+});
 ```
 
 ## Production Considerations
@@ -84,16 +76,18 @@ YourStore-Signature: abc123...
 X-Timestamp: 1234567890
 
 {
-  "event": "order_updated",
-  "checkout_session_id": "uuid",
-  "status": "shipped",
-  "order": {
-    "id": "order_123",
+  "type": "order_updated",
+  "data": {
+    "type": "order",
+    "checkout_session_id": "uuid",
+    "permalink_url": "https://yourstore.com/orders/order_123",
     "status": "shipped"
   },
-  "permalink_url": "https://yourstore.com/orders/order_123"
+  "timestamp": 1234567890
 }
 ```
+
+Note: The timestamp is included in the signed payload to prevent replay attacks.
 
 ## Events
 

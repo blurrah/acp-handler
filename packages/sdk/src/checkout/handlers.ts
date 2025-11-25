@@ -604,7 +604,7 @@ export function acpHandler(config: {
 			/**
 			 * Send order created webhook
 			 * @param sessionId - Checkout session ID
-			 * @param data - Webhook event data
+			 * @param webhookConfig - Webhook configuration and event data
 			 */
 			async sendOrderCreated(
 				sessionId: string,
@@ -612,16 +612,12 @@ export function acpHandler(config: {
 					webhookUrl: string;
 					secret: string;
 					merchantName?: string;
+					timeoutMs?: number;
 					permalinkUrl: string;
 					status?: OrderStatus;
 					refunds?: Refund[];
 				},
 			): Promise<void> {
-				const session = await sessions.get(sessionId);
-				if (!session) {
-					throw new Error(`Session "${sessionId}" not found`);
-				}
-
 				const { createOutboundWebhook } = await import(
 					"./webhooks/outbound.ts"
 				);
@@ -629,6 +625,7 @@ export function acpHandler(config: {
 					webhookUrl: webhookConfig.webhookUrl,
 					secret: webhookConfig.secret,
 					merchantName: webhookConfig.merchantName,
+					timeoutMs: webhookConfig.timeoutMs,
 				});
 
 				await webhook.orderCreated({
@@ -643,7 +640,7 @@ export function acpHandler(config: {
 			/**
 			 * Send order updated webhook
 			 * @param sessionId - Checkout session ID
-			 * @param data - Webhook event data
+			 * @param webhookConfig - Webhook configuration and event data
 			 */
 			async sendOrderUpdated(
 				sessionId: string,
@@ -651,16 +648,12 @@ export function acpHandler(config: {
 					webhookUrl: string;
 					secret: string;
 					merchantName?: string;
+					timeoutMs?: number;
 					permalinkUrl: string;
 					status: OrderStatus;
 					refunds?: Refund[];
 				},
 			): Promise<void> {
-				const session = await sessions.get(sessionId);
-				if (!session) {
-					throw new Error(`Session "${sessionId}" not found`);
-				}
-
 				const { createOutboundWebhook } = await import(
 					"./webhooks/outbound.ts"
 				);
@@ -668,6 +661,7 @@ export function acpHandler(config: {
 					webhookUrl: webhookConfig.webhookUrl,
 					secret: webhookConfig.secret,
 					merchantName: webhookConfig.merchantName,
+					timeoutMs: webhookConfig.timeoutMs,
 				});
 
 				await webhook.orderUpdated({

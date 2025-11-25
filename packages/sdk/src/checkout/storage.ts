@@ -32,7 +32,14 @@ export function createRedisSessionStore(kv: KV, ns = "acp"): SessionStore {
 	return {
 		async get(id: string): Promise<CheckoutSession | null> {
 			const s = await kv.get(K(id));
-			return s ? JSON.parse(s) : null;
+			if (!s) return null;
+			try {
+				return JSON.parse(s) as CheckoutSession;
+			} catch {
+				// Corrupted session data - treat as not found to prevent crashes
+				// In production, this should be logged for investigation
+				return null;
+			}
 		},
 		async put(session: CheckoutSession, ttlSec = 24 * 3600) {
 			await kv.set(K(session.id), JSON.stringify(session), ttlSec);

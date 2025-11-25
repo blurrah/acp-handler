@@ -79,6 +79,10 @@ export type CompleteCheckoutSessionRequest = {
 	fulfillment?: { selected_id?: string };
 };
 
+export type CompleteCheckoutSessionResponse = CheckoutSession & {
+	order: Order;
+};
+
 export type Order = {
 	id: string;
 	checkout_session_id: string;

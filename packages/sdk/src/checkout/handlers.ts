@@ -12,6 +12,7 @@ import { createRedisSessionStore } from "./storage.ts";
 import type {
 	CheckoutSession,
 	CompleteCheckoutSessionRequest,
+	CompleteCheckoutSessionResponse,
 	CreateCheckoutSessionRequest,
 	Order,
 	OrderStatus,
@@ -274,7 +275,7 @@ export function createHandlers(
 				span?.setAttribute("session_id", id);
 				idek && span?.setAttribute("idempotency_key", idek);
 
-				const compute = async () => {
+				const compute = async (): Promise<CompleteCheckoutSessionResponse> => {
 					const s = await traced(
 						tracer,
 						"session.get",
@@ -368,7 +369,7 @@ export function createHandlers(
 
 					span?.setAttribute("idempotency_reused", reused.toString());
 
-					return ok(value, {
+					return ok<CompleteCheckoutSessionResponse>(value, {
 						status: 200,
 						echo: {
 							[HEADERS.IDEMPOTENCY]: idek,

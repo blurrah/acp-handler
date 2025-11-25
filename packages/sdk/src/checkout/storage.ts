@@ -35,11 +35,7 @@ export function createRedisSessionStore(kv: KV, ns = "acp"): SessionStore {
 			return s ? JSON.parse(s) : null;
 		},
 		async put(session: CheckoutSession, ttlSec = 24 * 3600) {
-			await kv.set(
-				K(session.id),
-				JSON.stringify({ ...session, updated_at: new Date().toISOString() }),
-				ttlSec,
-			);
+			await kv.set(K(session.id), JSON.stringify(session), ttlSec);
 		},
 	};
 }

@@ -337,15 +337,8 @@ export function createHandlers(
 							status: 400,
 						});
 
-					const can = canTransition(s.status, "completed");
-					if (can !== true)
-						throw new ACPError({
-							code: "invalid_state",
-							message: can.error,
-							param: "status",
-							type: "invalid_request_error",
-							status: 400,
-						});
+					// Note: FSM transition is already validated above (status must be "ready_for_payment")
+					// and ready_for_payment -> completed is always valid per fsm.ts
 
 					const completed: CheckoutSession = {
 						...s,

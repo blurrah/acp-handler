@@ -46,9 +46,7 @@ export async function withIdempotency<T>(
 		// Check if concurrent request failed - propagate failure to maintain idempotency
 		const failMarker = await store.get(`${key}:fail`);
 		if (failMarker) {
-			throw new Error(
-				`Idempotent request previously failed at ${failMarker}`,
-			);
+			throw new Error(`Idempotent request previously failed at ${failMarker}`);
 		}
 		// Still pending or no result - retry after another wait
 		await new Promise((r) => setTimeout(r, pendingSleepMs * 4));
@@ -58,9 +56,7 @@ export async function withIdempotency<T>(
 		// Check fail marker again after longer wait
 		const failMarker2 = await store.get(`${key}:fail`);
 		if (failMarker2) {
-			throw new Error(
-				`Idempotent request previously failed at ${failMarker2}`,
-			);
+			throw new Error(`Idempotent request previously failed at ${failMarker2}`);
 		}
 		// If we still can't get a result, throw rather than risk double-execution
 		throw new Error(

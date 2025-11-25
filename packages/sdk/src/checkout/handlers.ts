@@ -229,10 +229,7 @@ export function createHandlers(
 					if (quote.ready && s.status === "not_ready_for_payment") {
 						// Can upgrade from not_ready to ready
 						nextStatus = "ready_for_payment";
-					} else if (
-						!quote.ready &&
-						s.status === "not_ready_for_payment"
-					) {
+					} else if (!quote.ready && s.status === "not_ready_for_payment") {
 						// Stay in not_ready state
 						nextStatus = "not_ready_for_payment";
 					}

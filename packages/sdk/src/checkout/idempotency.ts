@@ -5,18 +5,26 @@ export interface IdemStore {
 }
 
 export type IdempotencyOptions<T> = {
+	/** TTL for idempotency cache in seconds. Default: 24 hours (matches session TTL) */
 	ttlSec?: number;
 	serialize?: (value: T) => string;
 	deserialize?: (raw: string) => T;
 	pendingSleepMs?: number; // backoff while waiting for concurrent setter
 };
 
+/**
+ * Idempotency TTL should match or exceed session TTL (24 hours) to prevent
+ * double-execution of payments when clients retry after the idempotency
+ * cache expires but before the session expires.
+ */
+const DEFAULT_IDEMPOTENCY_TTL_SEC = 24 * 3600; // 24 hours
+
 export async function withIdempotency<T>(
 	key: string | undefined,
 	store: IdemStore,
 	compute: () => Promise<T>,
 	{
-		ttlSec = 3600,
+		ttlSec = DEFAULT_IDEMPOTENCY_TTL_SEC,
 		serialize = JSON.stringify as (v: T) => string,
 		deserialize = JSON.parse as (raw: string) => T,
 		pendingSleepMs = 25,
